@@ -1,0 +1,182 @@
+# ================================
+# Claude Code & Sensitive Files
+# ================================
+
+# Local Claude settings (may contain API keys)
+.claude/settings.local.json
+.claude/api-configs/*.json
+!.claude/api-configs/README.md
+
+# Environment variables and secrets
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+*.p12
+*.pfx
+secrets.json
+credentials.json
+
+# ================================
+# Python
+# ================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv/
+*.egg-info/
+.eggs/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ================================
+# Node.js / Frontend
+# ================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+frontend/dist/
+*.tsbuildinfo
+.cache/
+*.cache
+
+# ================================
+# Build / Dist (generic)
+# ================================
+dist/
+build/
+*.whl
+
+# ================================
+# Large Media Files
+# ================================
+*.mp3
+*.wav
+*.flac
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.psd
+*.ai
+*.sketch
+*.fig
+
+# ================================
+# Data & Database
+# ================================
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+*.dump
+*.bak
+*.backup
+
+# Large data files — small samples allowed via !rules below
+*.csv
+*.tsv
+*.xlsx
+*.xls
+*.parquet
+*.feather
+*.arrow
+
+# Allow small example/test data files
+!examples/**/*.csv
+!tests/fixtures/**/*.csv
+!**/samples/*.csv
+!examples/**/*.pkl
+!tests/fixtures/**/*.pkl
+!**/samples/*.pkl
+
+# Compressed archives
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.7z
+*.rar
+*.bz2
+*.xz
+*.csv.gz
+*.json.gz
+*.jsonl.gz
+
+# Python data/model files
+*.pkl
+*.pickle
+*.joblib
+*.npy
+*.npz
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.pb
+*.h5
+*.hdf5
+
+# Project-ignored data directories (大文件目录)
+data/raw/*
+data/processed/*
+data/interim/*
+data/external/*
+!data/samples/
+
+# ================================
+# ML / Notebook
+# ================================
+checkpoints/
+models/
+weights/
+runs/
+outputs/
+mlruns/
+wandb/
+tensorboard_logs/
+lightning_logs/
+.ipynb_checkpoints/
+
+# ================================
+# OS / IDE
+# ================================
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+*~
+
+# ================================
+# Logs / Temp
+# ================================
+*.log
+logs/
+*.tmp
+*.temp
+tmp/
+temp/
+
+# ================================
+# Project-Specific
+# ================================
+
+# Third-party (observability / local)
+langfuse/
+
+# Ad-hoc local files
+USER_ACTION.md
