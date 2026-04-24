@@ -203,6 +203,7 @@
 **状态**：🔄 in-progress（持续）
 **详情**：
 - [2026-04-25] 初始化 Claude Code 项目配置：AGENTS.md / CLAUDE.md / checkpoint.md / docs 骨架
+- [2026-04-25] 产出 `docs/design-docs/architecture.md`：系统架构文档 v1.0（四层模型、LangGraph 编排、存储拓扑、数据流、已知风险）
 
 ---
 
