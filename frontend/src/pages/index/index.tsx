@@ -9,6 +9,7 @@ import { Input, message } from 'antd'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { INDUSTRY_CONFIGS, setCurrentIndustry } from '@/store/industry'
+import { deviceActions } from '@/store/device'
 import styles from './index.module.scss'
 
 // 行业卡片颜色配置
@@ -48,9 +49,11 @@ export default function Index() {
   }, [cardList, searchKeyword])
 
   // 点击卡片，切换行业并跳转到聊天页
+  // 默认开启深度搜索（网络），让用户直接体验 Deep Research
   const handleCardClick = (industryId: string, title: string) => {
     console.log('[Index] 点击行业卡片:', industryId, title)
     setCurrentIndustry(industryId)
+    deviceActions.setSearchModes(['web'])
     navigate(`/chat?title=${encodeURIComponent(title)}`)
   }
 
