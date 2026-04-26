@@ -28,6 +28,10 @@
 
 ### 全局待办
 
+- ✅ ~~环境就绪：Docker compose 6 服务全部 healthy（postgres/redis/milvus/etcd/minio/elasticsearch）~~
+- ✅ ~~后端启动：uv venv + requirements.txt 装完，FastAPI on :8000，/hello 200~~
+- ✅ ~~前端启动：npm install（项目级 .npmrc 绕开本地代理）+ Vite dev on :5183~~
+- 盘点现有 11 router + 22 service 的实际能力，决定是「优化既有」还是「按 PRD 重做」
 - 撰写 PRD：明确目标用户、核心问题、成功标准
 - 架构评审：确认 backend/frontend 与 search/knowledge-graph/visualization 的职责边界
 - 完成 I/O spec：各核心接口定义函数签名、输入输出样例
@@ -46,15 +50,18 @@
 
 **负责**：Unassigned
 **状态**：未开始 (0%)
-**测试状态**：⚠️ 未验证（最后运行：-）
+**测试状态**：⚠️ 不涉及（本次仅环境配置）
 **分支**：main
 **最后更新**：2026-04-25
 
 ### 最近完成
+- [2026-04-25] 创建 `backend/.env`，填入 `DASHSCOPE_API_KEY` 与 `BOCHA_API_KEY`
+- [2026-04-25] 路径决策：放弃 CODEX 中转站，全链路使用 DashScope（兼容 embedding/rerank，零代码改动）
 - 项目初始化（Claude Code 配置、AGENTS.md/CLAUDE.md）
 - 已存在 backend/app/ 代码骨架（待盘点）
 
 ### 进行中
+- 等待 Docker Desktop 安装完成后启动后端
 - 盘点现有代码结构与功能
 
 ### 下一步
@@ -202,14 +209,20 @@
 ### 文档维护
 **状态**：🔄 in-progress（持续）
 **详情**：
+- [2026-04-25] /load 演练 + 深度盘点项目结构（11 个 FastAPI 路由 / 6 Agent LangGraph 编排 / 5 Docker 服务依赖）
 - [2026-04-25] 初始化 Claude Code 项目配置：AGENTS.md / CLAUDE.md / checkpoint.md / docs 骨架
 - [2026-04-25] 产出 `docs/design-docs/architecture.md`：系统架构文档 v1.0（四层模型、LangGraph 编排、存储拓扑、数据流、已知风险）
+- [2026-04-25] 全栈环境拉通：Docker 6 服务 healthy / backend uv venv + Python 3.12.7 / frontend npm + Vite 5183，新增 `frontend/.npmrc`（绕本地代理）+ `.gitignore` 增加 `.npmrc` 规则
+- [2026-04-26] 面试 P0 准备完成：D1 补丁（点行业卡片自动开深度搜索）+ `tests/research_demo.py` 真跑「金融科技」query（24min/136 事件/200 源/6 章大纲）+ `docs/exec-plans/active/interview-prep.md`（速查卡：60s pitch + 3 张 Mermaid 架构图 + 6 类追问对答 + 实测指标）
 
 ---
 
 ## 已知问题
 
 - 根目录存在 `READMED.md` 拼写错误（预期为 `README.md`），待处理
+- backend 招标采集 API（bid.81api.com）返回 401，因为 `BID_APP_KEY/BID_APP_CODE` 仍是 .env 中的占位值，需用户补真实 Key
+- backend 控制台日志中文显示乱码（Windows GBK 编码问题），不影响功能，后续可加 `PYTHONIOENCODING=utf-8` 修复
+- frontend `.npmrc` 中空 `proxy=` 触发 npm warn，但不影响安装结果（已验证）
 
 ## 技术决策记录
 

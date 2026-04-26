@@ -4,4 +4,4 @@
 
 | 文档 | 路径 | 描述 | 更新日期 |
 |------|------|------|---------|
-| _暂无_ | - | 初始化后待填充 | 2026-04-25 |
+| 面试速查卡 | [active/interview-prep.md](./active/interview-prep.md) | Talk track + Mermaid 架构图 + Q&A 骨架 + Demo 指标位 | 2026-04-26 |
