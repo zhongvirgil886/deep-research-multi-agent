@@ -1,6 +1,6 @@
 # Checkpoint
 
-> 最后更新：2026-04-25
+> 最后更新：2026-04-27
 
 ## 项目信息
 
@@ -31,11 +31,11 @@
 - ✅ ~~环境就绪：Docker compose 6 服务全部 healthy（postgres/redis/milvus/etcd/minio/elasticsearch）~~
 - ✅ ~~后端启动：uv venv + requirements.txt 装完，FastAPI on :8000，/hello 200~~
 - ✅ ~~前端启动：npm install（项目级 .npmrc 绕开本地代理）+ Vite dev on :5183~~
-- 盘点现有 11 router + 22 service 的实际能力，决定是「优化既有」还是「按 PRD 重做」
-- 撰写 PRD：明确目标用户、核心问题、成功标准
-- 架构评审：确认 backend/frontend 与 search/knowledge-graph/visualization 的职责边界
-- 完成 I/O spec：各核心接口定义函数签名、输入输出样例
-- 输出 Master Plan 并走 Hard Gate 审批
+- ✅ ~~盘点现有 11 router + 22 service 的实际能力 → 决定保留引擎本体，做业务定位重塑 + UI 升级~~
+- ✅ ~~产出 v2 spec（rubric-based 单产出，3 轮 review approved）：`docs/product-specs/v2-advertiser-signals-spec.md`~~
+- 进入 writing-plans：基于 v2 spec 出 Master Plan + Hard Gate 审批
+- 实施改造：按 Master Plan 顺序落地（scoring_rubric.yaml / scoring_service.py / 4 类目重命名 / chat-trace U2 重建）
+- 实施完后同步更新 `interview-prep.md` 的 talk track + 跑一份真实评分 demo
 
 ### 依赖关系
 
@@ -214,6 +214,7 @@
 - [2026-04-25] 产出 `docs/design-docs/architecture.md`：系统架构文档 v1.0（四层模型、LangGraph 编排、存储拓扑、数据流、已知风险）
 - [2026-04-25] 全栈环境拉通：Docker 6 服务 healthy / backend uv venv + Python 3.12.7 / frontend npm + Vite 5183，新增 `frontend/.npmrc`（绕本地代理）+ `.gitignore` 增加 `.npmrc` 规则
 - [2026-04-26] 面试 P0 准备完成：D1 补丁（点行业卡片自动开深度搜索）+ `tests/research_demo.py` 真跑「金融科技」query（24min/136 事件/200 源/6 章大纲）+ `docs/exec-plans/active/interview-prep.md`（速查卡：60s pitch + 3 张 Mermaid 架构图 + 6 类追问对答 + 实测指标）
+- [2026-04-27] 完成 brainstorming + 产出 v2 spec（rubric-based 单产出版）：`docs/product-specs/v2-advertiser-signals-spec.md` 三轮 spec-document-reviewer subagent 审 approved。核心定位：金融广告主多智能体 deep research，报告末尾追加 5 维度 rubric 评分（业务扩张度 25% / 监管态度 25% / 品牌活跃度 20% / 竞争地位 15% / 创新与数字化 15%）。同时产出 `docs/exec-plans/active/ui-mockups.html`（U1/U2/U3 三种风格对比，已选 U2）+ 项目 memory（feedback_proxy_isolation / feedback_no_time_estimates）
 
 ---
 
