@@ -4,4 +4,4 @@
 
 | 文档 | 描述 | 更新日期 |
 |------|------|---------|
-| _暂无_ | 初始化后待填充 | 2026-04-25 |
+| [v2-advertiser-signals-spec.md](./v2-advertiser-signals-spec.md) | v2 改造方案：广告主基本面信号特征工程（扰动模型配套）+ dual-mode engine + Frontend U2 改造 | 2026-04-27 |

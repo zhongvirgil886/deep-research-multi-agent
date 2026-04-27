@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>v2 UI 风格预览 · U1 / U2 / U3</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        fontFamily: {
+          sans: ['Inter', 'system-ui', '-apple-system', 'PingFang SC', 'sans-serif'],
+          mono: ['JetBrains Mono', 'SF Mono', 'monospace'],
+        },
+      },
+    },
+  };
+</script>
+<style>
+  body { font-family: 'Inter', system-ui, sans-serif; }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  .tab-btn.active { background: #6366f1; color: white; }
+
+  /* U1 LangSmith-trace expandable rows */
+  .span-row:hover { background: rgba(99, 102, 241, 0.06); }
+  .u1-divider { background: linear-gradient(to bottom, transparent, #27272a 20%, #27272a 80%, transparent); }
+
+  /* sparkline svg style */
+  .sparkline path { fill: none; stroke: #818cf8; stroke-width: 1.5; }
+  .sparkline-bg path { fill: none; stroke: #27272a; stroke-width: 1; }
+
+  /* Dot pulse for running state */
+  @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .dot-running { animation: pulse-dot 1.5s ease-in-out infinite; }
+
+  /* Linear-style focus ring */
+  .focus-ring:focus { outline: none; box-shadow: 0 0 0 2px #6366f1; }
+
+  /* U2 antd-like header */
+  .u2-header { background: #ffffff; border-bottom: 1px solid #f0f0f0; box-shadow: 0 1px 4px rgba(0,21,41,0.08); }
+
+  /* U3 token-only — Linear-ized but light */
+  .u3-bg { background: #fafafa; color: #18181b; }
+  .u3-card { background: #ffffff; border: 1px solid #e4e4e7; }
+</style>
+</head>
+<body class="bg-zinc-950 min-h-screen">
+
+<!-- ========================================================== -->
+<!-- TAB SWITCHER                                                -->
+<!-- ========================================================== -->
+<header class="bg-zinc-900 text-zinc-100 sticky top-0 z-50 border-b border-zinc-800">
+  <div class="max-w-[1600px] mx-auto px-6 py-3 flex items-center gap-3">
+    <span class="font-semibold text-sm mr-4">v2 UI 风格预览</span>
+    <button onclick="show(event,'u1')" class="tab-btn active text-xs px-3 py-1.5 rounded font-medium transition">
+      U1 · Linear + LangSmith <span class="text-zinc-400">（推荐）</span>
+    </button>
+    <button onclick="show(event,'u2')" class="tab-btn text-xs px-3 py-1.5 rounded font-medium transition text-zinc-400 hover:text-zinc-100">
+      U2 · 只改 chat-trace 页
+    </button>
+    <button onclick="show(event,'u3')" class="tab-btn text-xs px-3 py-1.5 rounded font-medium transition text-zinc-400 hover:text-zinc-100">
+      U3 · 只改全局 token
+    </button>
+    <span class="ml-auto text-xs text-zinc-500 mono">chat-research page mockup</span>
+  </div>
+</header>
+
+<!-- ============================================================== -->
+<!-- U1 · Linear shell + LangSmith trace + Tremor cards (DARK)        -->
+<!-- ============================================================== -->
+<div id="u1" class="tab-content active">
+<div class="bg-zinc-950 text-zinc-200 min-h-[calc(100vh-49px)] flex">
+
+  <!-- Left Sidebar (Linear style) -->
+  <aside class="w-56 bg-zinc-900/50 border-r border-zinc-800 flex flex-col">
+    <div class="px-4 py-3 border-b border-zinc-800">
+      <div class="flex items-center gap-2">
+        <div class="w-6 h-6 rounded bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-[10px] font-bold">DR</div>
+        <span class="text-sm font-semibold">Deep Research</span>
+        <span class="ml-auto text-[10px] mono text-zinc-500">v2.0</span>
+      </div>
+    </div>
+
+    <div class="px-2 py-3 space-y-0.5 flex-1">
+      <div class="px-2 py-1 text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Workspace</div>
+      <a class="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-zinc-400 hover:bg-zinc-800/50">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        Home
+      </a>
+      <a class="flex items-center gap-2 px-2 py-1.5 rounded text-xs bg-indigo-500/10 text-indigo-300">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+        Research
+        <span class="ml-auto text-[10px] mono bg-indigo-500/20 px-1 rounded">3</span>
+      </a>
+      <a class="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-zinc-400 hover:bg-zinc-800/50">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        Features
+        <span class="ml-auto text-[10px] mono text-zinc-600">1,142</span>
+      </a>
+      <a class="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-zinc-400 hover:bg-zinc-800/50">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        History
+      </a>
+
+      <div class="px-2 py-1 mt-4 text-[10px] uppercase tracking-wider text-zinc-500 font-medium">Pipelines</div>
+      <a class="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-zinc-400 hover:bg-zinc-800/50">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+        Securities · weekly
+      </a>
+      <a class="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-zinc-400 hover:bg-zinc-800/50">
+        <span class="w-1.5 h-1.5 rounded-full bg-zinc-600"></span>
+        Banking · weekly
+      </a>
+      <a class="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-zinc-400 hover:bg-zinc-800/50">
+        <span class="w-1.5 h-1.5 rounded-full bg-amber-400 dot-running"></span>
+        Insurance · running
+      </a>
+    </div>
+
+    <div class="px-3 py-2 border-t border-zinc-800 flex items-center gap-2">
+      <div class="w-6 h-6 rounded-full bg-gradient-to-br from-pink-500 to-orange-500"></div>
+      <div class="text-xs">
+        <div class="font-medium">Zhong</div>
+        <div class="text-zinc-500 text-[10px]">Ad Algo Team</div>
+      </div>
+      <kbd class="ml-auto mono text-[10px] px-1.5 py-0.5 bg-zinc-800 rounded">⌘K</kbd>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="flex-1 flex flex-col min-w-0">
+
+    <!-- Top breadcrumb bar -->
+    <div class="border-b border-zinc-800 px-6 py-2.5 flex items-center gap-3 text-xs">
+      <span class="text-zinc-500">Research</span>
+      <svg class="w-3 h-3 text-zinc-700" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+      <span class="text-zinc-200 font-medium">中信证券 · 2026 W17</span>
+      <div class="ml-auto flex items-center gap-3">
+        <span class="text-zinc-500 mono text-[11px]">session: <span class="text-zinc-300">a4f8</span></span>
+        <button class="px-2.5 py-1 text-zinc-300 hover:bg-zinc-800 rounded">Resume</button>
+        <button class="px-2.5 py-1 bg-indigo-500 hover:bg-indigo-600 text-white rounded font-medium">Export Features</button>
+      </div>
+    </div>
+
+    <!-- Query header card -->
+    <div class="px-6 py-4 border-b border-zinc-800">
+      <div class="flex items-start gap-4">
+        <div class="flex-1">
+          <div class="flex items-center gap-2 mb-1.5">
+            <span class="text-[10px] mono uppercase tracking-wider text-zinc-500">Advertiser Research</span>
+            <span class="text-[10px] mono px-1.5 py-0.5 bg-emerald-500/10 text-emerald-400 rounded">Mode B · Features</span>
+          </div>
+          <h1 class="text-base font-medium leading-snug">为「中信证券」生成本周扰动模型基本面特征向量</h1>
+          <p class="text-xs text-zinc-500 mt-1">started 04:23 · running 03:42 · agent calls 18 · tokens 24.3K</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="px-2 py-1 mono text-[10px] bg-amber-500/10 text-amber-400 rounded flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-400 dot-running"></span>
+            analyzing
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Split view -->
+    <div class="flex-1 flex min-h-0">
+      <!-- LEFT: Trace inspector (LangSmith) -->
+      <div class="w-[58%] border-r border-zinc-800 overflow-auto">
+        <div class="px-4 py-3 border-b border-zinc-800 flex items-center gap-2 text-[11px]">
+          <span class="text-zinc-500 mono uppercase tracking-wider">Agent Trace</span>
+          <span class="text-zinc-700">·</span>
+          <button class="text-zinc-400 hover:text-zinc-200">Expand all</button>
+          <span class="ml-auto text-zinc-600 mono">5 phases · 18 calls</span>
+        </div>
+
+        <div class="font-mono text-xs">
+          <!-- Phase: plan -->
+          <div class="span-row border-b border-zinc-900 hover:cursor-pointer">
+            <div class="flex items-center px-4 py-2 gap-2">
+              <svg class="w-3 h-3 text-zinc-600 transform rotate-90" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+              <span class="text-emerald-400">●</span>
+              <span class="text-zinc-100 font-medium">plan</span>
+              <span class="text-indigo-300/70">ChiefArchitect</span>
+              <span class="text-zinc-500 ml-auto">2.4s · 412 tok</span>
+            </div>
+            <div class="px-10 py-1.5 text-zinc-500 text-[11px]">
+              outline 12 dims · 6 research questions
+            </div>
+          </div>
+
+          <!-- Phase: research -->
+          <div class="span-row border-b border-zinc-900">
+            <div class="flex items-center px-4 py-2 gap-2 hover:cursor-pointer">
+              <svg class="w-3 h-3 text-zinc-600 transform rotate-90" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+              <span class="text-emerald-400">●</span>
+              <span class="text-zinc-100 font-medium">research</span>
+              <span class="text-indigo-300/70">DeepScout</span>
+              <span class="text-zinc-500 ml-auto">87.3s · 6.2K tok</span>
+            </div>
+
+            <!-- Nested calls -->
+            <div class="ml-8 border-l border-zinc-800">
+              <div class="span-row hover:cursor-pointer">
+                <div class="flex items-center px-4 py-1.5 gap-2">
+                  <span class="text-zinc-700 text-[10px]">▸</span>
+                  <span class="text-emerald-400/70">●</span>
+                  <span class="text-zinc-300">tool_call</span>
+                  <span class="text-zinc-500">bocha_search</span>
+                  <span class="text-zinc-600 truncate">"中信证券 监管 2026"</span>
+                  <span class="text-zinc-500 ml-auto">8.2s · 5 hits</span>
+                </div>
+              </div>
+              <div class="span-row hover:cursor-pointer">
+                <div class="flex items-center px-4 py-1.5 gap-2">
+                  <span class="text-zinc-700 text-[10px]">▸</span>
+                  <span class="text-emerald-400/70">●</span>
+                  <span class="text-zinc-300">tool_call</span>
+                  <span class="text-zinc-500">bocha_search</span>
+                  <span class="text-zinc-600 truncate">"中信证券 牌照 2025-2026"</span>
+                  <span class="text-zinc-500 ml-auto">7.8s · 6 hits</span>
+                </div>
+              </div>
+              <div class="span-row hover:cursor-pointer">
+                <div class="flex items-center px-4 py-1.5 gap-2">
+                  <span class="text-zinc-700 text-[10px]">▸</span>
+                  <span class="text-emerald-400/70">●</span>
+                  <span class="text-zinc-300">tool_call</span>
+                  <span class="text-zinc-500">source_tracing</span>
+                  <span class="text-zinc-600 truncate">depth=2 · pbc.gov.cn</span>
+                  <span class="text-zinc-500 ml-auto">22.5s · 4 facts</span>
+                </div>
+              </div>
+              <div class="span-row hover:cursor-pointer">
+                <div class="flex items-center px-4 py-1.5 gap-2">
+                  <span class="text-zinc-700 text-[10px]">▸</span>
+                  <span class="text-emerald-400/70">●</span>
+                  <span class="text-zinc-300">tool_call</span>
+                  <span class="text-zinc-500">local_kb</span>
+                  <span class="text-zinc-600 truncate">「中信证券」内部基本面</span>
+                  <span class="text-zinc-500 ml-auto">1.2s · 3 docs</span>
+                </div>
+              </div>
+              <div class="span-row hover:cursor-pointer">
+                <div class="flex items-center px-4 py-1.5 gap-2">
+                  <span class="text-zinc-700 text-[10px]">▸</span>
+                  <span class="text-emerald-400/70">●</span>
+                  <span class="text-zinc-300">llm_call</span>
+                  <span class="text-zinc-500">extract_facts</span>
+                  <span class="text-zinc-500 ml-auto">31.4s · 4.1K tok</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Phase: analyze (current, expanded with detail) -->
+          <div class="span-row border-b border-zinc-900 bg-indigo-500/[0.03]">
+            <div class="flex items-center px-4 py-2 gap-2 hover:cursor-pointer">
+              <svg class="w-3 h-3 text-indigo-400 transform rotate-90" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+              <span class="text-amber-400 dot-running">●</span>
+              <span class="text-zinc-100 font-medium">analyze</span>
+              <span class="text-indigo-300/70">DataAnalyst</span>
+              <span class="text-amber-400 ml-auto">running · 41.2s</span>
+            </div>
+
+            <div class="ml-8 border-l border-indigo-500/30">
+              <div class="span-row hover:cursor-pointer">
+                <div class="flex items-center px-4 py-1.5 gap-2">
+                  <span class="text-zinc-700 text-[10px]">▸</span>
+                  <span class="text-emerald-400/70">●</span>
+                  <span class="text-zinc-300">code_exec</span>
+                  <span class="text-zinc-500">density_features.py</span>
+                  <span class="text-zinc-500 ml-auto">2.1s · ok</span>
+                </div>
+              </div>
+              <div class="span-row hover:cursor-pointer">
+                <div class="flex items-center px-4 py-1.5 gap-2">
+                  <span class="text-zinc-700 text-[10px]">▸</span>
+                  <span class="text-emerald-400/70">●</span>
+                  <span class="text-zinc-300">code_exec</span>
+                  <span class="text-zinc-500">consensus_score.py</span>
+                  <span class="text-zinc-500 ml-auto">0.4s · ok</span>
+                </div>
+              </div>
+              <div class="span-row hover:cursor-pointer">
+                <div class="flex items-center px-4 py-1.5 gap-2">
+                  <span class="text-zinc-700 text-[10px]">▸</span>
+                  <span class="text-amber-400 dot-running">●</span>
+                  <span class="text-zinc-300">llm_call</span>
+                  <span class="text-zinc-500">score_business_health</span>
+                  <span class="text-amber-400 ml-auto">streaming...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pending phases -->
+          <div class="span-row border-b border-zinc-900 opacity-50">
+            <div class="flex items-center px-4 py-2 gap-2">
+              <svg class="w-3 h-3 text-zinc-700" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+              <span class="text-zinc-700">○</span>
+              <span class="text-zinc-500">write</span>
+              <span class="text-zinc-700">LeadWriter</span>
+              <span class="text-zinc-700 ml-auto mono">pending</span>
+            </div>
+          </div>
+          <div class="span-row border-b border-zinc-900 opacity-50">
+            <div class="flex items-center px-4 py-2 gap-2">
+              <svg class="w-3 h-3 text-zinc-700" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+              <span class="text-zinc-700">○</span>
+              <span class="text-zinc-500">review</span>
+              <span class="text-zinc-700">SignalCritic</span>
+              <span class="text-zinc-700 ml-auto mono">pending</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Output preview (Tremor cards) -->
+      <div class="flex-1 overflow-auto bg-zinc-950">
+        <!-- Output tabs -->
+        <div class="px-4 py-2 border-b border-zinc-800 flex items-center gap-1 text-xs">
+          <button class="px-2.5 py-1 rounded bg-zinc-800 text-zinc-100 font-medium">Features <span class="ml-1 text-[10px] mono text-zinc-500">12</span></button>
+          <button class="px-2.5 py-1 rounded text-zinc-400 hover:bg-zinc-800/50">Report</button>
+          <button class="px-2.5 py-1 rounded text-zinc-400 hover:bg-zinc-800/50">Sources <span class="ml-1 text-[10px] mono text-zinc-600">23</span></button>
+          <button class="px-2.5 py-1 rounded text-zinc-400 hover:bg-zinc-800/50">Knowledge Graph</button>
+        </div>
+
+        <div class="p-4">
+          <!-- TLDR card -->
+          <div class="mb-4 bg-gradient-to-br from-indigo-500/10 to-violet-500/5 border border-indigo-500/20 rounded p-3">
+            <div class="text-[10px] mono uppercase tracking-wider text-indigo-300 mb-1">推荐扰动倾向</div>
+            <div class="flex items-baseline gap-2">
+              <span class="text-2xl font-semibold text-zinc-100 mono">+0.18</span>
+              <span class="text-xs text-zinc-400">利好倾向 · confidence 0.74</span>
+            </div>
+            <div class="text-[11px] text-zinc-500 mt-1">建议特征注入扰动模型，由模型判定最终系数。</div>
+          </div>
+
+          <!-- Feature grid -->
+          <div class="grid grid-cols-2 gap-2 text-xs">
+
+            <!-- LLM-derived features -->
+            <div class="bg-zinc-900/50 border border-zinc-800 rounded p-3">
+              <div class="flex items-start justify-between mb-1">
+                <span class="text-zinc-400 text-[11px]">business_health</span>
+                <span class="text-[9px] mono px-1 py-0.5 bg-violet-500/10 text-violet-400 rounded">llm</span>
+              </div>
+              <div class="text-lg font-semibold mono text-zinc-100">+0.42</div>
+              <svg class="sparkline w-full h-6 mt-1" viewBox="0 0 100 24"><path d="M0,18 L20,16 L40,12 L60,10 L80,7 L100,5"/></svg>
+              <div class="text-[10px] text-zinc-600 mt-0.5">vs. last week +0.08</div>
+            </div>
+
+            <div class="bg-zinc-900/50 border border-zinc-800 rounded p-3">
+              <div class="flex items-start justify-between mb-1">
+                <span class="text-zinc-400 text-[11px]">regulatory_pressure</span>
+                <span class="text-[9px] mono px-1 py-0.5 bg-violet-500/10 text-violet-400 rounded">llm</span>
+              </div>
+              <div class="text-lg font-semibold mono text-zinc-100">−0.18</div>
+              <svg class="sparkline w-full h-6 mt-1" viewBox="0 0 100 24"><path d="M0,8 L20,9 L40,11 L60,13 L80,14 L100,15"/></svg>
+              <div class="text-[10px] text-zinc-600 mt-0.5">轻度负面 · 1 处罚单</div>
+            </div>
+
+            <div class="bg-zinc-900/50 border border-zinc-800 rounded p-3">
+              <div class="flex items-start justify-between mb-1">
+                <span class="text-zinc-400 text-[11px]">media_sentiment</span>
+                <span class="text-[9px] mono px-1 py-0.5 bg-amber-500/10 text-amber-400 rounded">nlp</span>
+              </div>
+              <div class="text-lg font-semibold mono text-zinc-100">+0.31</div>
+              <svg class="sparkline w-full h-6 mt-1" viewBox="0 0 100 24"><path d="M0,16 L20,14 L40,15 L60,11 L80,9 L100,8"/></svg>
+              <div class="text-[10px] text-zinc-600 mt-0.5">12 篇正面 / 3 篇中性</div>
+            </div>
+
+            <div class="bg-zinc-900/50 border border-zinc-800 rounded p-3">
+              <div class="flex items-start justify-between mb-1">
+                <span class="text-zinc-400 text-[11px]">competitive_position</span>
+                <span class="text-[9px] mono px-1 py-0.5 bg-violet-500/10 text-violet-400 rounded">llm</span>
+              </div>
+              <div class="text-lg font-semibold mono text-zinc-100">+0.22</div>
+              <svg class="sparkline w-full h-6 mt-1" viewBox="0 0 100 24"><path d="M0,15 L20,14 L40,12 L60,12 L80,10 L100,11"/></svg>
+              <div class="text-[10px] text-zinc-600 mt-0.5">同业 4 家中位 +1</div>
+            </div>
+
+            <div class="bg-zinc-900/50 border border-zinc-800 rounded p-3">
+              <div class="flex items-start justify-between mb-1">
+                <span class="text-zinc-400 text-[11px]">innovation_signal</span>
+                <span class="text-[9px] mono px-1 py-0.5 bg-violet-500/10 text-violet-400 rounded">llm</span>
+              </div>
+              <div class="text-lg font-semibold mono text-zinc-100">+0.55</div>
+              <svg class="sparkline w-full h-6 mt-1" viewBox="0 0 100 24"><path d="M0,20 L20,18 L40,14 L60,9 L80,6 L100,4"/></svg>
+              <div class="text-[10px] text-zinc-600 mt-0.5">2 项新业务公告</div>
+            </div>
+
+            <!-- Deterministic features -->
+            <div class="bg-zinc-900/50 border border-zinc-800 rounded p-3">
+              <div class="flex items-start justify-between mb-1">
+                <span class="text-zinc-400 text-[11px]">source_diversity</span>
+                <span class="text-[9px] mono px-1 py-0.5 bg-emerald-500/10 text-emerald-400 rounded">det</span>
+              </div>
+              <div class="text-lg font-semibold mono text-zinc-100">0.78</div>
+              <svg class="sparkline w-full h-6 mt-1" viewBox="0 0 100 24"><path d="M0,12 L20,10 L40,9 L60,8 L80,7 L100,7"/></svg>
+              <div class="text-[10px] text-zinc-600 mt-0.5">11 distinct domains</div>
+            </div>
+
+            <div class="bg-zinc-900/50 border border-zinc-800 rounded p-3">
+              <div class="flex items-start justify-between mb-1">
+                <span class="text-zinc-400 text-[11px]">source_authority</span>
+                <span class="text-[9px] mono px-1 py-0.5 bg-emerald-500/10 text-emerald-400 rounded">det</span>
+              </div>
+              <div class="text-lg font-semibold mono text-zinc-100">0.83</div>
+              <svg class="sparkline w-full h-6 mt-1" viewBox="0 0 100 24"><path d="M0,9 L20,8 L40,8 L60,7 L80,6 L100,6"/></svg>
+              <div class="text-[10px] text-zinc-600 mt-0.5">6 official · 17 news</div>
+            </div>
+
+            <div class="bg-zinc-900/50 border border-zinc-800 rounded p-3">
+              <div class="flex items-start justify-between mb-1">
+                <span class="text-zinc-400 text-[11px]">consensus_score</span>
+                <span class="text-[9px] mono px-1 py-0.5 bg-emerald-500/10 text-emerald-400 rounded">det</span>
+              </div>
+              <div class="text-lg font-semibold mono text-zinc-100">0.71</div>
+              <svg class="sparkline w-full h-6 mt-1" viewBox="0 0 100 24"><path d="M0,14 L20,12 L40,11 L60,10 L80,9 L100,9"/></svg>
+              <div class="text-[10px] text-zinc-600 mt-0.5">cross-source agreement</div>
+            </div>
+
+            <div class="bg-zinc-900/50 border border-zinc-800 rounded p-3">
+              <div class="flex items-start justify-between mb-1">
+                <span class="text-zinc-400 text-[11px]">activity_density_7d</span>
+                <span class="text-[9px] mono px-1 py-0.5 bg-emerald-500/10 text-emerald-400 rounded">det</span>
+              </div>
+              <div class="text-lg font-semibold mono text-zinc-100">8</div>
+              <svg class="sparkline w-full h-6 mt-1" viewBox="0 0 100 24"><path d="M0,18 L14,16 L28,17 L42,12 L56,10 L70,8 L84,7 L100,5"/></svg>
+              <div class="text-[10px] text-zinc-600 mt-0.5">events / 7d</div>
+            </div>
+
+            <div class="bg-zinc-900/50 border border-zinc-800 rounded p-3">
+              <div class="flex items-start justify-between mb-1">
+                <span class="text-zinc-400 text-[11px]">trend_direction</span>
+                <span class="text-[9px] mono px-1 py-0.5 bg-emerald-500/10 text-emerald-400 rounded">det</span>
+              </div>
+              <div class="text-lg font-semibold mono text-zinc-100">+0.62</div>
+              <svg class="sparkline w-full h-6 mt-1" viewBox="0 0 100 24"><path d="M0,18 L25,15 L50,11 L75,7 L100,4"/></svg>
+              <div class="text-[10px] text-zinc-600 mt-0.5">7d 加速 vs 30d 均值</div>
+            </div>
+
+            <div class="bg-zinc-900/50 border border-zinc-800 rounded p-3 col-span-2">
+              <div class="flex items-start justify-between mb-1">
+                <span class="text-zinc-400 text-[11px]">event_types</span>
+                <span class="text-[9px] mono px-1 py-0.5 bg-emerald-500/10 text-emerald-400 rounded">det</span>
+              </div>
+              <div class="flex flex-wrap gap-1.5 mt-1.5">
+                <span class="text-[10px] mono px-2 py-0.5 bg-emerald-500/10 text-emerald-300 rounded">license_approval</span>
+                <span class="text-[10px] mono px-2 py-0.5 bg-emerald-500/10 text-emerald-300 rounded">partnership</span>
+                <span class="text-[10px] mono px-2 py-0.5 bg-amber-500/10 text-amber-300 rounded">regulatory_warning</span>
+                <span class="text-[10px] mono px-2 py-0.5 bg-emerald-500/10 text-emerald-300 rounded">product_launch</span>
+                <span class="text-[10px] mono px-2 py-0.5 bg-zinc-700/30 text-zinc-400 rounded">leadership_change</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Footer hint -->
+          <div class="mt-4 px-3 py-2 bg-zinc-900/50 border border-zinc-800 rounded text-[10px] text-zinc-500 mono flex items-center gap-2">
+            <span class="text-zinc-600">→</span>
+            on completion → write to <span class="text-indigo-300">feature_store:advertiser:cit</span>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</div>
+
+
+<!-- ============================================================== -->
+<!-- U2 · 只改 chat-trace 页 (其他页保留 antd 默认)                    -->
+<!-- ============================================================== -->
+<div id="u2" class="tab-content">
+
+<!-- antd-style top header -->
+<div class="u2-header h-12 px-6 flex items-center" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+  <span class="text-sm font-medium text-gray-800">行业资讯助手</span>
+  <span class="ml-6 text-xs text-gray-400">/ 研究详情</span>
+  <div class="ml-auto flex items-center gap-3 text-sm">
+    <span class="text-gray-500">中信证券 · 2026 W17</span>
+    <button class="px-3 py-1 text-blue-500 border border-blue-500 rounded text-xs">导出特征</button>
+  </div>
+</div>
+
+<!-- antd-style sidebar with old industry cards style -->
+<div class="flex" style="height: calc(100vh - 49px - 48px);">
+  <aside class="w-48 bg-gray-50 border-r border-gray-200 p-3 text-sm" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+    <div class="text-xs text-gray-400 px-2 py-1">导航</div>
+    <a class="flex items-center gap-2 px-2 py-2 rounded text-gray-600 hover:bg-gray-100">首页</a>
+    <a class="flex items-center gap-2 px-2 py-2 rounded text-blue-500 bg-blue-50">研究中心</a>
+    <a class="flex items-center gap-2 px-2 py-2 rounded text-gray-600 hover:bg-gray-100">资讯</a>
+    <a class="flex items-center gap-2 px-2 py-2 rounded text-gray-600 hover:bg-gray-100">知识库</a>
+    <a class="flex items-center gap-2 px-2 py-2 rounded text-gray-600 hover:bg-gray-100">数据库</a>
+  </aside>
+
+  <!-- Main: chat-trace area is upgraded to LangSmith style (DARK panel inset) -->
+  <main class="flex-1 flex bg-white">
+    <!-- The trace panel becomes a dark inset card on light background -->
+    <div class="flex-1 p-4 overflow-auto">
+      <!-- Query header (antd style) -->
+      <div class="bg-white border border-gray-200 rounded p-4 mb-4" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-xs px-2 py-0.5 bg-green-50 text-green-600 rounded">Mode B · 特征</span>
+          <span class="text-xs text-gray-400 mono">session a4f8</span>
+        </div>
+        <h2 class="text-base font-medium text-gray-800">为「中信证券」生成本周扰动模型基本面特征向量</h2>
+        <p class="text-xs text-gray-500 mt-1">已运行 03:42 · 18 次 agent 调用 · 24.3K tokens</p>
+      </div>
+
+      <!-- LangSmith-style trace panel (dark inset on light bg) -->
+      <div class="bg-zinc-950 text-zinc-200 border border-zinc-800 rounded overflow-hidden">
+        <div class="px-4 py-2.5 border-b border-zinc-800 flex items-center text-xs">
+          <span class="text-zinc-500 mono uppercase tracking-wider">Agent Trace</span>
+          <span class="ml-auto text-zinc-600 mono">5 phases · 18 calls</span>
+        </div>
+
+        <div class="font-mono text-xs">
+          <div class="span-row border-b border-zinc-900">
+            <div class="flex items-center px-4 py-2 gap-2">
+              <span class="text-emerald-400">●</span>
+              <span class="text-zinc-100 font-medium">plan</span>
+              <span class="text-indigo-300/70">ChiefArchitect</span>
+              <span class="text-zinc-500 ml-auto">2.4s</span>
+            </div>
+          </div>
+          <div class="span-row border-b border-zinc-900">
+            <div class="flex items-center px-4 py-2 gap-2">
+              <span class="text-emerald-400">●</span>
+              <span class="text-zinc-100 font-medium">research</span>
+              <span class="text-indigo-300/70">DeepScout</span>
+              <span class="text-zinc-500 ml-auto">87.3s · 23 sources</span>
+            </div>
+          </div>
+          <div class="span-row border-b border-zinc-900 bg-indigo-500/[0.05]">
+            <div class="flex items-center px-4 py-2 gap-2">
+              <span class="text-amber-400 dot-running">●</span>
+              <span class="text-zinc-100 font-medium">analyze</span>
+              <span class="text-indigo-300/70">DataAnalyst</span>
+              <span class="text-amber-400 ml-auto">running 41.2s</span>
+            </div>
+          </div>
+          <div class="span-row border-b border-zinc-900 opacity-50">
+            <div class="flex items-center px-4 py-2 gap-2">
+              <span class="text-zinc-700">○</span>
+              <span class="text-zinc-500">write</span>
+              <span class="text-zinc-700">LeadWriter</span>
+              <span class="text-zinc-700 ml-auto">pending</span>
+            </div>
+          </div>
+          <div class="span-row">
+            <div class="flex items-center px-4 py-2 gap-2 opacity-50">
+              <span class="text-zinc-700">○</span>
+              <span class="text-zinc-500">review</span>
+              <span class="text-zinc-700">SignalCritic</span>
+              <span class="text-zinc-700 ml-auto">pending</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <p class="text-xs text-gray-400 mt-3" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+        ↑ chat-trace 视图重做为 LangSmith 风格暗色面板，嵌在 antd 默认浅色 shell 里。其他页（首页 / 资讯 / 知识库等）保持 antd 现状不动。
+      </p>
+    </div>
+
+    <!-- Right: feature output (antd table style) -->
+    <div class="w-96 border-l border-gray-200 bg-white p-4" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+      <div class="flex items-center gap-1 border-b border-gray-200 mb-3">
+        <button class="px-3 py-2 text-xs text-blue-500 border-b-2 border-blue-500 -mb-px">特征向量</button>
+        <button class="px-3 py-2 text-xs text-gray-500">报告</button>
+        <button class="px-3 py-2 text-xs text-gray-500">来源</button>
+      </div>
+
+      <table class="w-full text-xs">
+        <thead class="text-gray-500">
+          <tr><th class="text-left font-normal py-1.5">维度</th><th class="text-right font-normal py-1.5">值</th><th class="text-right font-normal py-1.5">类型</th></tr>
+        </thead>
+        <tbody class="border-t border-gray-100">
+          <tr class="border-b border-gray-100"><td class="py-2 text-gray-700">business_health</td><td class="py-2 text-right mono text-gray-900 font-medium">+0.42</td><td class="py-2 text-right text-gray-400">llm</td></tr>
+          <tr class="border-b border-gray-100"><td class="py-2 text-gray-700">regulatory_pressure</td><td class="py-2 text-right mono text-gray-900 font-medium">−0.18</td><td class="py-2 text-right text-gray-400">llm</td></tr>
+          <tr class="border-b border-gray-100"><td class="py-2 text-gray-700">media_sentiment</td><td class="py-2 text-right mono text-gray-900 font-medium">+0.31</td><td class="py-2 text-right text-gray-400">nlp</td></tr>
+          <tr class="border-b border-gray-100"><td class="py-2 text-gray-700">competitive_position</td><td class="py-2 text-right mono text-gray-900 font-medium">+0.22</td><td class="py-2 text-right text-gray-400">llm</td></tr>
+          <tr class="border-b border-gray-100"><td class="py-2 text-gray-700">innovation_signal</td><td class="py-2 text-right mono text-gray-900 font-medium">+0.55</td><td class="py-2 text-right text-gray-400">llm</td></tr>
+          <tr class="border-b border-gray-100"><td class="py-2 text-gray-700">source_diversity</td><td class="py-2 text-right mono text-gray-900 font-medium">0.78</td><td class="py-2 text-right text-gray-400">det</td></tr>
+          <tr class="border-b border-gray-100"><td class="py-2 text-gray-700">source_authority</td><td class="py-2 text-right mono text-gray-900 font-medium">0.83</td><td class="py-2 text-right text-gray-400">det</td></tr>
+          <tr class="border-b border-gray-100"><td class="py-2 text-gray-700">consensus_score</td><td class="py-2 text-right mono text-gray-900 font-medium">0.71</td><td class="py-2 text-right text-gray-400">det</td></tr>
+          <tr class="border-b border-gray-100"><td class="py-2 text-gray-700">activity_density_7d</td><td class="py-2 text-right mono text-gray-900 font-medium">8</td><td class="py-2 text-right text-gray-400">det</td></tr>
+          <tr><td class="py-2 text-gray-700">trend_direction</td><td class="py-2 text-right mono text-gray-900 font-medium">+0.62</td><td class="py-2 text-right text-gray-400">det</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+</div>
+
+
+<!-- ============================================================== -->
+<!-- U3 · 只改全局 token (布局完全不变, 字体/颜色/圆角换掉)             -->
+<!-- ============================================================== -->
+<div id="u3" class="tab-content">
+
+<!-- header u3 -->
+<div class="bg-white border-b border-zinc-200 px-6 py-2.5 flex items-center" style="font-family: 'Inter', system-ui, sans-serif;">
+  <div class="flex items-center gap-2">
+    <div class="w-5 h-5 rounded bg-zinc-900 flex items-center justify-center text-[9px] font-bold text-white">DR</div>
+    <span class="text-sm font-medium text-zinc-900">Deep Research</span>
+  </div>
+  <span class="mx-3 text-zinc-300">·</span>
+  <span class="text-sm text-zinc-500">研究详情</span>
+  <div class="ml-auto flex items-center gap-3 text-sm">
+    <span class="text-zinc-500 mono text-xs">a4f8</span>
+    <button class="px-3 py-1 text-zinc-700 border border-zinc-200 rounded text-xs hover:bg-zinc-50">恢复</button>
+    <button class="px-3 py-1 bg-zinc-900 text-white rounded text-xs hover:bg-zinc-800">导出特征</button>
+  </div>
+</div>
+
+<div class="flex u3-bg" style="height: calc(100vh - 49px - 41px);">
+  <!-- Sidebar: same antd-style structure but cleaner tokens -->
+  <aside class="w-44 bg-white border-r border-zinc-200 p-3 text-sm">
+    <div class="text-[10px] uppercase tracking-wider text-zinc-400 px-2 py-1 font-medium">导航</div>
+    <a class="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-zinc-600 hover:bg-zinc-100">首页</a>
+    <a class="flex items-center gap-2 px-2 py-1.5 rounded text-xs bg-indigo-50 text-indigo-600 font-medium">研究中心</a>
+    <a class="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-zinc-600 hover:bg-zinc-100">资讯</a>
+    <a class="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-zinc-600 hover:bg-zinc-100">知识库</a>
+    <a class="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-zinc-600 hover:bg-zinc-100">数据库</a>
+  </aside>
+
+  <!-- Main: same layout as current chat-trace, just with Inter + tighter tokens -->
+  <main class="flex-1 flex">
+    <div class="flex-1 p-4 overflow-auto">
+      <!-- Query header card -->
+      <div class="u3-card rounded p-4 mb-3">
+        <div class="flex items-center gap-2 mb-2">
+          <span class="text-[10px] mono uppercase tracking-wider text-zinc-500">Advertiser Research</span>
+          <span class="text-[10px] mono px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded">Mode B</span>
+        </div>
+        <h2 class="text-base font-medium text-zinc-900">为「中信证券」生成本周扰动模型基本面特征向量</h2>
+        <p class="text-xs text-zinc-500 mt-1">running 03:42 · 18 calls · 24.3K tokens</p>
+      </div>
+
+      <!-- Steps (linear list, same layout as current) -->
+      <div class="u3-card rounded">
+        <div class="px-4 py-2.5 border-b border-zinc-100 text-[11px] mono uppercase tracking-wider text-zinc-500">研究步骤</div>
+        <div>
+          <div class="px-4 py-2.5 border-b border-zinc-100 flex items-center gap-3 text-sm">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="text-zinc-700 font-medium">📋 规划阶段</span>
+            <span class="text-zinc-500 text-xs">ChiefArchitect</span>
+            <span class="ml-auto text-zinc-500 text-xs mono">2.4s · 412 tok</span>
+          </div>
+          <div class="px-4 py-2.5 border-b border-zinc-100 flex items-center gap-3 text-sm">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            <span class="text-zinc-700 font-medium">🔍 搜索阶段</span>
+            <span class="text-zinc-500 text-xs">DeepScout</span>
+            <span class="ml-auto text-zinc-500 text-xs mono">87.3s · 23 sources</span>
+          </div>
+          <div class="px-4 py-2.5 border-b border-zinc-100 flex items-center gap-3 text-sm bg-indigo-50/50">
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 dot-running"></span>
+            <span class="text-zinc-900 font-medium">📊 分析阶段</span>
+            <span class="text-zinc-500 text-xs">DataAnalyst</span>
+            <span class="ml-auto text-amber-600 text-xs">running 41.2s</span>
+          </div>
+          <div class="px-4 py-2.5 border-b border-zinc-100 flex items-center gap-3 text-sm opacity-50">
+            <span class="w-1.5 h-1.5 rounded-full bg-zinc-300"></span>
+            <span class="text-zinc-500">✍️ 写作阶段</span>
+            <span class="text-zinc-400 text-xs">LeadWriter</span>
+            <span class="ml-auto text-zinc-400 text-xs">pending</span>
+          </div>
+          <div class="px-4 py-2.5 flex items-center gap-3 text-sm opacity-50">
+            <span class="w-1.5 h-1.5 rounded-full bg-zinc-300"></span>
+            <span class="text-zinc-500">🔎 审核阶段</span>
+            <span class="text-zinc-400 text-xs">SignalCritic</span>
+            <span class="ml-auto text-zinc-400 text-xs">pending</span>
+          </div>
+        </div>
+      </div>
+
+      <p class="text-xs text-zinc-500 mt-3">
+        ↑ 布局完全保留 chat-trace 现有结构，只是 token 重置：Inter 字体 / 中性灰阶 / 圆角 4px / accent 改成 indigo 而非默认蓝 / 间距收紧。最低风险也最低收益。
+      </p>
+    </div>
+
+    <!-- Right: feature output -->
+    <aside class="w-80 border-l border-zinc-200 bg-white p-4">
+      <div class="flex items-center gap-2 border-b border-zinc-200 mb-3 -mx-4 px-4">
+        <button class="px-3 py-2 text-xs text-indigo-600 border-b-2 border-indigo-500 -mb-px font-medium">特征向量</button>
+        <button class="px-3 py-2 text-xs text-zinc-500">报告</button>
+        <button class="px-3 py-2 text-xs text-zinc-500">来源</button>
+      </div>
+
+      <div class="space-y-2">
+        <div class="flex items-baseline justify-between text-sm">
+          <span class="text-zinc-600">business_health</span>
+          <span class="mono font-medium text-zinc-900">+0.42</span>
+        </div>
+        <div class="flex items-baseline justify-between text-sm">
+          <span class="text-zinc-600">regulatory_pressure</span>
+          <span class="mono font-medium text-zinc-900">−0.18</span>
+        </div>
+        <div class="flex items-baseline justify-between text-sm">
+          <span class="text-zinc-600">media_sentiment</span>
+          <span class="mono font-medium text-zinc-900">+0.31</span>
+        </div>
+        <div class="flex items-baseline justify-between text-sm">
+          <span class="text-zinc-600">competitive_position</span>
+          <span class="mono font-medium text-zinc-900">+0.22</span>
+        </div>
+        <div class="flex items-baseline justify-between text-sm">
+          <span class="text-zinc-600">innovation_signal</span>
+          <span class="mono font-medium text-zinc-900">+0.55</span>
+        </div>
+        <div class="border-t border-zinc-100 pt-2 mt-2"></div>
+        <div class="flex items-baseline justify-between text-sm">
+          <span class="text-zinc-500">source_diversity</span>
+          <span class="mono text-zinc-700">0.78</span>
+        </div>
+        <div class="flex items-baseline justify-between text-sm">
+          <span class="text-zinc-500">source_authority</span>
+          <span class="mono text-zinc-700">0.83</span>
+        </div>
+        <div class="flex items-baseline justify-between text-sm">
+          <span class="text-zinc-500">consensus_score</span>
+          <span class="mono text-zinc-700">0.71</span>
+        </div>
+        <div class="flex items-baseline justify-between text-sm">
+          <span class="text-zinc-500">activity_density_7d</span>
+          <span class="mono text-zinc-700">8</span>
+        </div>
+        <div class="flex items-baseline justify-between text-sm">
+          <span class="text-zinc-500">trend_direction</span>
+          <span class="mono text-zinc-700">+0.62</span>
+        </div>
+      </div>
+    </aside>
+  </main>
+</div>
+</div>
+
+
+<!-- ============================================================== -->
+<!-- FOOTER COMPARISON                                                -->
+<!-- ============================================================== -->
+<div class="bg-zinc-900 text-zinc-400 px-6 py-4 text-xs border-t border-zinc-800 mono">
+  <div class="max-w-[1600px] mx-auto">
+    <span class="text-zinc-500">tip:</span> 上方切换 U1/U2/U3 对比同一个「研究详情」页在三种风格下的样子。Mock 数据：query=中信证券基本面研究 · session=a4f8 · phase=analyzing
+  </div>
+</div>
+
+<script>
+function show(e, id) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active', 'bg-indigo-500', 'text-white'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.add('text-zinc-400'));
+  e.currentTarget.classList.remove('text-zinc-400');
+  e.currentTarget.classList.add('active', 'bg-indigo-500', 'text-white');
+}
+</script>
+
+</body>
+</html>
