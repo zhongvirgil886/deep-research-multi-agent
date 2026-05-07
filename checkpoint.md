@@ -1,5 +1,15 @@
 # Checkpoint
 
+## Codex Save - 2026-05-08
+
+- Saved DeepResearch V2 runtime repair session before cloud push.
+- Completed fixes: demo runner loads `backend/.env`, returns real exit codes, uses ASCII-safe trace status labels, rejects empty/zero-score E2E results, and supports `DR_V2_DEMO_TIMEOUT_SECONDS`.
+- Completed fixes: DashScope-compatible max token clamp, bounded DeepScout search budget, LLM output normalization, portable CodeWizard debug dirs, syntax-failure short-circuit before sandbox execution, and JSONB-safe checkpoint serialization without runtime queues.
+- Added regression coverage in `tests/test_deep_research_v2_runtime.py` for env loading, exit codes, token clamp, DeepScout budget/normalization, CodeWizard cleanup/invalid-code handling, checkpoint serialization, E2E success criteria, and timeout guard.
+- Docker Desktop/compose was recovered and verified: postgres, redis, milvus, etcd, minio, elasticsearch healthy; Postgres `select 1`, Milvus connect, and checkpoint DB smoke passed.
+- Verification: `backend\.venv\Scripts\python.exe -m unittest tests.test_deep_research_v2_runtime -v` -> 17 tests OK; `backend\.venv\Scripts\python.exe -m py_compile ...` -> OK; 30s timeout guard trace exited 1 as expected.
+- Ignored local generated artifacts: root chart PNGs and `tests/traces/`. Remaining risk: full live E2E still depends on slow/unstable external LLM calls; next work should add graph-level Agent failure propagation and a smaller agents-only/e2e-only demo mode.
+
 > 最后更新：2026-05-07
 
 ## 项目信息

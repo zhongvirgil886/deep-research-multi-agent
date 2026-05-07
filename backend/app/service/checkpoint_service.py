@@ -15,6 +15,12 @@ from core.database import SessionLocal
 logger = logging.getLogger(__name__)
 
 
+RUNTIME_STATE_KEYS = {
+    "_message_queue",
+    "_sse_queue",
+}
+
+
 class CheckpointService:
     """检查点服务"""
 
@@ -315,19 +321,31 @@ class CheckpointService:
         """
         clean = {}
         for key, value in state.items():
-            try:
-                # 尝试序列化测试
-                json.dumps(value, default=str)
-                clean[key] = value
-            except (TypeError, ValueError):
-                # 跳过不可序列化的值，或转换为字符串
-                if isinstance(value, (list, tuple)):
-                    clean[key] = [str(v) for v in value]
-                elif isinstance(value, dict):
-                    clean[key] = self._clean_state_for_storage(value)
-                else:
-                    clean[key] = str(value)
+            if key in RUNTIME_STATE_KEYS:
+                continue
+            clean[key] = self._clean_value_for_storage(value)
         return clean
+
+    def _clean_value_for_storage(self, value: Any) -> Any:
+        """Recursively convert values to JSONB-safe Python primitives."""
+        if isinstance(value, dict):
+            return {
+                key: self._clean_value_for_storage(item)
+                for key, item in value.items()
+                if key not in RUNTIME_STATE_KEYS
+            }
+        if isinstance(value, list):
+            return [self._clean_value_for_storage(item) for item in value]
+        if isinstance(value, tuple):
+            return [self._clean_value_for_storage(item) for item in value]
+        if isinstance(value, set):
+            return [self._clean_value_for_storage(item) for item in value]
+
+        try:
+            json.dumps(value)
+            return value
+        except (TypeError, ValueError):
+            return str(value)
 
 
 # 单例

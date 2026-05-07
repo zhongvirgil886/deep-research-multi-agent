@@ -19,7 +19,11 @@ import os
 import sys
 import asyncio
 import logging
+import builtins
+from pathlib import Path
 from datetime import datetime
+
+from dotenv import load_dotenv
 
 # 确保能导入项目模块
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -29,6 +33,92 @@ logging.basicConfig(
     format='%(asctime)s [%(levelname)s] %(name)s: %(message)s'
 )
 logger = logging.getLogger("E2E_Test")
+
+TRACE_SYMBOLS = {
+    "✅": "[OK]",
+    "❌": "[FAIL]",
+    "⚠️": "[WARN]",
+    "⚠": "[WARN]",
+    "📝": "[QUERY]",
+    "🔄": "[PHASE]",
+    "📋": "[OUTLINE]",
+    "🔍": "[SEARCH]",
+    "📊": "[ANALYSIS]",
+    "✍️": "[WRITE]",
+    "✍": "[WRITE]",
+    "📄": "[REPORT]",
+    "ℹ️": "[INFO]",
+    "ℹ": "[INFO]",
+    "⏱️": "[TIME]",
+    "⏱": "[TIME]",
+    "📨": "[EVENTS]",
+}
+
+
+def _format_trace_text(value: object) -> str:
+    text = str(value)
+    for symbol, replacement in TRACE_SYMBOLS.items():
+        text = text.replace(symbol, replacement)
+    return text
+
+
+def trace_print(*args, **kwargs) -> None:
+    builtins.print(*(_format_trace_text(arg) for arg in args), **kwargs)
+
+
+print = trace_print
+
+
+def configure_trace_output() -> None:
+    """Make trace printing safe on Windows consoles using legacy encodings."""
+    for stream_name in ("stdout", "stderr"):
+        stream = getattr(sys, stream_name, None)
+        if hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(errors="replace")
+            except (OSError, ValueError):
+                pass
+
+
+def load_demo_env(env_path: str | os.PathLike | None = None) -> None:
+    """Load backend/.env for direct script execution without overriding shell env."""
+    if env_path is None:
+        env_path = Path(__file__).resolve().parents[2] / ".env"
+    load_dotenv(dotenv_path=env_path, override=False)
+
+
+def is_successful_research_result(
+    phases_seen: set[str],
+    events: list[dict],
+    error_count: int,
+) -> bool:
+    """Return whether the live E2E run produced a usable research result."""
+    expected_phases = {"planning", "researching", "analyzing", "writing", "reviewing"}
+    if expected_phases - phases_seen or error_count > 0:
+        return False
+
+    complete_events = [event for event in events if event.get("type") == "research_complete"]
+    if not complete_events:
+        return False
+
+    final_event = complete_events[-1]
+    final_report = str(final_event.get("final_report") or "").strip()
+    quality_score = float(final_event.get("quality_score") or 0)
+    facts_count = int(final_event.get("facts_count") or 0)
+    return bool(final_report) and quality_score > 0 and facts_count > 0
+
+
+async def run_with_timeout(coro, timeout_seconds: float | None, label: str) -> int:
+    """Run a coroutine with an optional timeout and return a process exit code."""
+    try:
+        if timeout_seconds and timeout_seconds > 0:
+            result = await asyncio.wait_for(coro, timeout=timeout_seconds)
+        else:
+            result = await coro
+        return int(result)
+    except asyncio.TimeoutError:
+        print(f"\n[FAIL] {label} timed out after {timeout_seconds:.1f} seconds")
+        return 1
 
 
 async def test_full_workflow():
@@ -180,10 +270,7 @@ async def test_full_workflow():
         print(f"\n⚠️ 缺失阶段: {', '.join(missing_phases)}")
         return False
 
-    # 检查是否有最终报告
-    has_final_report = any(e.get("type") == "research_complete" for e in events)
-
-    if has_final_report and error_count == 0:
+    if is_successful_research_result(phases_seen, events, error_count):
         print("\n" + "=" * 60)
         print("✅ 端到端测试通过!")
         print("=" * 60)
@@ -191,8 +278,13 @@ async def test_full_workflow():
     else:
         print("\n" + "=" * 60)
         print("❌ 测试失败")
+        has_final_report = any(e.get("type") == "research_complete" for e in events)
         if not has_final_report:
             print("   - 未生成最终报告")
+        elif not str([e for e in events if e.get("type") == "research_complete"][-1].get("final_report") or "").strip():
+            print("   - 最终报告为空")
+        elif float([e for e in events if e.get("type") == "research_complete"][-1].get("quality_score") or 0) <= 0:
+            print("   - 质量分数无效")
         if error_count > 0:
             print(f"   - 有 {error_count} 个错误")
         print("=" * 60)
@@ -281,6 +373,9 @@ async def test_individual_agents():
 
 async def main():
     """主函数"""
+    configure_trace_output()
+    load_demo_env()
+
     print("\n" + "=" * 60)
     print("DeepResearch V2.0 端到端测试套件")
     print("时间:", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
@@ -291,7 +386,7 @@ async def main():
 
     if not unit_passed:
         print("\n⚠️ 单元测试失败，跳过端到端测试")
-        return
+        return 1
 
     # 运行端到端测试
     e2e_passed = await test_full_workflow()
@@ -303,7 +398,9 @@ async def main():
     print(f"Agent 单元测试: {'✅ 通过' if unit_passed else '❌ 失败'}")
     print(f"端到端测试: {'✅ 通过' if e2e_passed else '❌ 失败'}")
     print("=" * 60)
+    return 0 if unit_passed and e2e_passed else 1
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    timeout = float(os.getenv("DR_V2_DEMO_TIMEOUT_SECONDS", "0") or 0)
+    sys.exit(asyncio.run(run_with_timeout(main(), timeout, "DeepResearch V2 demo")))

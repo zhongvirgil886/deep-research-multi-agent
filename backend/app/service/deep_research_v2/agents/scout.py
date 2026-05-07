@@ -15,6 +15,7 @@ import uuid
 import asyncio
 import hashlib
 import requests
+import os
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
@@ -183,6 +184,8 @@ URL: {url}
         self.search_api_key = search_api_key
         self.search_cache: Dict[str, List] = {}
         self.fact_fingerprints: Dict[str, str] = {}  # 事实指纹用于去重
+        self.max_deep_search_calls = int(os.getenv("DR_V2_MAX_DEEP_SEARCH_CALLS", "8"))
+        self.max_deep_search_depth = int(os.getenv("DR_V2_MAX_DEEP_SEARCH_DEPTH", "1"))
 
         # 初始化本地知识库搜索服务
         self.milvus_service = None
@@ -804,7 +807,7 @@ URL: {url}
         search_type: str,
         hypotheses: List[Dict],
         depth: int = 1,
-        max_depth: int = 2
+        max_depth: Optional[int] = None
     ) -> None:
         """
         执行深度递归搜索
@@ -818,6 +821,9 @@ URL: {url}
             depth: 当前递归深度
             max_depth: 最大递归深度
         """
+        if max_depth is None:
+            max_depth = self.max_deep_search_depth
+
         if depth > max_depth:
             self.logger.info(f"Reached max recursion depth ({max_depth})")
             return
@@ -835,6 +841,20 @@ URL: {url}
         })
 
         for query in queries:
+            calls_used = state.setdefault("_deep_search_calls", 0)
+            if calls_used >= self.max_deep_search_calls:
+                self.logger.info(
+                    "Deep search budget exhausted (%s calls); skipping remaining %s queries",
+                    self.max_deep_search_calls,
+                    len(queries)
+                )
+                self.add_message(state, "thought", {
+                    "agent": self.name,
+                    "content": f"深度搜索预算已用尽（{self.max_deep_search_calls} 次），停止扩展搜索。"
+                })
+                return
+            state["_deep_search_calls"] = calls_used + 1
+
             # 执行搜索
             results = await self._execute_search(query, count=6)
 
@@ -1312,14 +1332,45 @@ URL: {r.get('url', '')}
         # 简化版：使用内容hash
         # TODO: 集成向量嵌入进行语义相似度比较
         import re
+        content = self._coerce_text(content)
         # 提取数字和关键词作为指纹
         numbers = re.findall(r'\d+\.?\d*', content)
         keywords = re.findall(r'[\u4e00-\u9fa5]{2,4}', content)[:5]
         fingerprint = f"{','.join(numbers[:3])}|{','.join(keywords)}"
         return hashlib.md5(fingerprint.encode()).hexdigest()[:16]
 
+    def _coerce_text(self, value: Any) -> str:
+        """Coerce LLM-returned scalar/list/dict values into stable display text."""
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            return value
+        if isinstance(value, (list, tuple, set)):
+            return "; ".join(self._coerce_text(item) for item in value if self._coerce_text(item))
+        if isinstance(value, dict):
+            return "; ".join(
+                f"{self._coerce_text(key)}: {self._coerce_text(item)}"
+                for key, item in value.items()
+                if self._coerce_text(key) or self._coerce_text(item)
+            )
+        return str(value)
+
+    def _coerce_list(self, value: Any) -> List[Any]:
+        """Return list-like LLM output as a list without splitting normal strings."""
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return value
+        if isinstance(value, tuple):
+            return list(value)
+        if isinstance(value, set):
+            return list(value)
+        return [value]
+
     def _is_duplicate_fact(self, content: str, source_url: str) -> bool:
         """检查事实是否重复"""
+        content = self._coerce_text(content)
+        source_url = self._coerce_text(source_url)
         fingerprint = self._compute_fact_fingerprint(content)
 
         # 检查指纹是否已存在
@@ -1338,10 +1389,10 @@ URL: {r.get('url', '')}
     def _update_knowledge_graph(self, state: ResearchState, entities: List[Dict]) -> None:
         """更新知识图谱"""
         graph = state.get("knowledge_graph", {"nodes": [], "edges": []})
-        existing_nodes = {n.get("name") for n in graph["nodes"]}
+        existing_nodes = {self._coerce_text(n.get("name")) for n in graph["nodes"]}
 
         for entity in entities:
-            name = entity.get("name", "")
+            name = self._coerce_text(entity.get("name", ""))
             if not name or name in existing_nodes:
                 continue
 
@@ -1349,17 +1400,17 @@ URL: {r.get('url', '')}
             graph["nodes"].append({
                 "id": f"node_{len(graph['nodes'])}",
                 "name": name,
-                "type": entity.get("type", "unknown"),
+                "type": self._coerce_text(entity.get("type", "unknown")),
                 "discovered_at": datetime.now().isoformat()
             })
             existing_nodes.add(name)
 
             # 添加边（关系）
-            for relation in entity.get("relations", []):
+            for relation in self._coerce_list(entity.get("relations", [])):
                 # 简单解析关系
                 graph["edges"].append({
                     "source": name,
-                    "relation": relation,
+                    "relation": self._coerce_text(relation),
                     "discovered_at": datetime.now().isoformat()
                 })
 

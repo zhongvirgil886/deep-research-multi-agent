@@ -14,11 +14,20 @@ import time
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List, Union
 from datetime import datetime
+from urllib.parse import urlparse
 from openai import OpenAI
 
 from ..state import ResearchState, AgentLog
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s')
+
+
+def get_provider_max_tokens(base_url: str) -> Optional[int]:
+    """Return known provider completion-token limits for compatible APIs."""
+    host = urlparse(str(base_url or "")).netloc.lower()
+    if "dashscope.aliyuncs.com" in host:
+        return 8192
+    return None
 
 
 class BaseAgent(ABC):
@@ -39,6 +48,7 @@ class BaseAgent(ABC):
         self.name = name
         self.role = role
         self.model = model
+        self.llm_base_url = llm_base_url
         self.client = OpenAI(api_key=llm_api_key, base_url=llm_base_url)
         self.logger = logging.getLogger(f"Agent.{name}")
 
@@ -61,7 +71,7 @@ class BaseAgent(ABC):
         user_prompt: str,
         json_mode: bool = True,
         temperature: float = 0.3,
-        max_tokens: int = 16000  # 拉满到最大值
+        max_tokens: int = 16000
     ) -> str:
         """
         调用 LLM
@@ -77,6 +87,17 @@ class BaseAgent(ABC):
             LLM 响应文本
         """
         start_time = time.time()
+        provider_limit = get_provider_max_tokens(getattr(self.client, "base_url", ""))
+        if provider_limit is None:
+            provider_limit = get_provider_max_tokens(getattr(self, "llm_base_url", ""))
+        if provider_limit is not None and max_tokens > provider_limit:
+            self.logger.info(
+                "Clamping max_tokens for %s from %s to provider limit %s",
+                self.model,
+                max_tokens,
+                provider_limit
+            )
+            max_tokens = provider_limit
 
         try:
             kwargs = {

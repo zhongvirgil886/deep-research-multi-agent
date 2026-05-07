@@ -17,6 +17,9 @@ import json
 import base64
 import io
 import sys
+import os
+import tempfile
+from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from contextlib import redirect_stdout, redirect_stderr
@@ -349,6 +352,11 @@ df = df.dropna()
             llm_base_url=llm_base_url,
             model=model
         )
+        self.debug_base_dir = self._get_debug_base_dir()
+
+    def _get_debug_base_dir(self) -> Path:
+        """Return a writable debug directory across Windows/Linux/macOS."""
+        return Path(os.getenv("CODEWIZARD_DEBUG_DIR", Path(tempfile.gettempdir()) / "codewizard_debug"))
 
     async def process(self, state: ResearchState) -> ResearchState:
         """处理入口"""
@@ -891,6 +899,12 @@ df = df.dropna()
         protected = re_module.sub(r'^\\([a-zA-Z_])', r'\1', protected, flags=re_module.MULTILINE)
         # 也处理不在行首但在空格后的情况
         protected = re_module.sub(r'(\s)\\([a-zA-Z_][a-zA-Z0-9_]*\s*=)', r'\1\2', protected)
+        # 也处理粘在上一条语句后的情况，如 "...')\data = {...}"
+        protected = re_module.sub(
+            r"([\]\)'\"])\s*\\([a-zA-Z_][a-zA-Z0-9_]*\s*=)",
+            r'\1\n\2',
+            protected
+        )
 
         # 恢复字符串内的 \n
         protected = protected.replace(placeholder, '\\n')
@@ -931,18 +945,21 @@ df = df.dropna()
 
     def _save_debug_info(self, raw_code: str, cleaned_code: str, error: Exception = None):
         """保存调试信息到文件，方便排查问题"""
-        import os
         from datetime import datetime
 
-        debug_dir = "/tmp/codewizard_debug"
-        os.makedirs(debug_dir, exist_ok=True)
+        debug_dir = self._get_debug_base_dir()
+        debug_dir.mkdir(parents=True, exist_ok=True)
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         # 保存原始代码
         has_escaped_n = '\\n' in raw_code
         has_real_newline = '\n' in raw_code
-        with open(f"{debug_dir}/raw_code_{timestamp}.txt", "w") as f:
+        raw_path = debug_dir / f"raw_code_{timestamp}.txt"
+        cleaned_path = debug_dir / f"cleaned_code_{timestamp}.txt"
+        latest_path = debug_dir / "latest.txt"
+
+        with raw_path.open("w", encoding="utf-8") as f:
             f.write("=" * 60 + "\n")
             f.write("原始代码分析\n")
             f.write("=" * 60 + "\n")
@@ -955,7 +972,7 @@ df = df.dropna()
             f.write(raw_code)
 
         # 保存清理后代码
-        with open(f"{debug_dir}/cleaned_code_{timestamp}.txt", "w") as f:
+        with cleaned_path.open("w", encoding="utf-8") as f:
             f.write("=" * 60 + "\n")
             f.write("清理后代码\n")
             f.write("=" * 60 + "\n")
@@ -977,9 +994,9 @@ df = df.dropna()
                         f.write(f"{marker}Line {i+1}: {repr(lines[i])}\n")
 
         # 保存最新的调试文件路径（方便快速访问）
-        with open(f"{debug_dir}/latest.txt", "w") as f:
-            f.write(f"raw: {debug_dir}/raw_code_{timestamp}.txt\n")
-            f.write(f"cleaned: {debug_dir}/cleaned_code_{timestamp}.txt\n")
+        with latest_path.open("w", encoding="utf-8") as f:
+            f.write(f"raw: {raw_path}\n")
+            f.write(f"cleaned: {cleaned_path}\n")
             f.write(f"timestamp: {timestamp}\n")
 
         self.logger.info(f"[CodeWizard] 调试信息已保存到 {debug_dir}/")
@@ -990,19 +1007,18 @@ df = df.dropna()
 
         每次运行会创建一个带时间戳的目录，所有步骤保存在同一目录下
         """
-        import os
         from datetime import datetime
 
         # 使用实例变量保存当前调试会话的目录
         if not hasattr(self, '_debug_session_dir'):
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            self._debug_session_dir = f"/tmp/codewizard_debug/session_{timestamp}"
-            os.makedirs(self._debug_session_dir, exist_ok=True)
+            self._debug_session_dir = self._get_debug_base_dir() / f"session_{timestamp}"
+            self._debug_session_dir.mkdir(parents=True, exist_ok=True)
             self.logger.info(f"[CodeWizard] 调试会话目录: {self._debug_session_dir}")
 
         # 保存步骤日志
-        file_path = f"{self._debug_session_dir}/{step_name}.txt"
-        with open(file_path, "w", encoding="utf-8") as f:
+        file_path = self._debug_session_dir / f"{step_name}.txt"
+        with file_path.open("w", encoding="utf-8") as f:
             f.write(f"=== {step_name} ===\n")
             f.write(f"时间: {datetime.now().isoformat()}\n")
             f.write(f"长度: {len(content)} 字符\n")
@@ -1051,6 +1067,12 @@ df = df.dropna()
             self._save_debug_log("exec_3_syntax", f"FAILED: {e}\n\n错误行: {e.lineno}\n\n代码:\n{code}")
             # 保存调试信息
             self._save_debug_info(raw_code, code, e)
+            return {
+                "success": False,
+                "error": f"Syntax error after code cleanup: {e}",
+                "output": "",
+                "charts": []
+            }
 
         # 安全检查
         if not self._is_code_safe(code):
