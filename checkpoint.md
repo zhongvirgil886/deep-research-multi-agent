@@ -1,6 +1,6 @@
 # Checkpoint
 
-> 最后更新：2026-04-27
+> 最后更新：2026-05-07
 
 ## 项目信息
 
@@ -245,3 +245,15 @@
 
 - **最多 10 条**，超过时将最旧记录移动到 `docs/archive/checkpoint-history.md`
 - 单次 `/save` 如果新增条目使总数超过 10，必须先归档后再追加
+
+---
+
+## Codex 保存记录
+
+### 2026-05-07
+
+- 本次 `/save` 检查结果：工作区无未提交代码改动，`main` 与 `origin/main` 原本已对齐。
+- 已确认当前项目定位：应用层多智能体 Deep Research 系统，不是 Agentic Continual Pre-training 训练项目。
+- 已整理简历项目表述建议：强调 FastAPI + React + LangGraph 风格状态机、多 Agent 研究流水线、SSE 流式输出、checkpoint 续跑、多源检索、CodeWizard 分析执行、rubric-based 金融广告主基本面评分设计。
+- 当前 active 文档：`docs/product-specs/v2-advertiser-signals-spec.md`、`docs/exec-plans/active/interview-prep.md`、`docs/exec-plans/active/ui-mockups.html`。
+- 推送策略：本次仅新增 checkpoint 保存记录；代码与产品文档主体无额外变更。
