@@ -570,13 +570,78 @@ LLM 返回空结果或解析失败时，系统应返回空结构，不应中断�
 
 #### 12.3.2 调用链与方案
 
-1. Graph 发送 `phase="analyzing"`，先调用 `DataAnalyst.process(state)`。
-2. DataAnalyst 调用 `_extract_data()`，读取前 20 条事实。
-3. Agent 通过 `DATA_EXTRACTION_PROMPT` 调用 LLM，提取 `data_points/time_series/distributions/insights`。
-4. DataAnalyst 调用 `_build_knowledge_graph()`，读取前 15 条事实，提取实体和关系。
-5. 系统按 `importance` 为图谱节点计算 `size`。
-6. DataAnalyst 调用 `_generate_charts()`，把本轮提取数据和已有 `data_points` 传给 `CHART_GENERATION_PROMPT`。
-7. 如果存在可用数据，LLM 输出 ECharts `option`；如果没有数据，则跳过图表生成。
+##### 12.3.2.1 进入分析阶段：把研究材料转成结构化分析产物
+
+**当前行为**：Graph 发送 `phase="analyzing"`，先调用 `DataAnalyst.process(state)`。
+
+**目标**：把 Step2 收集到的事实、来源和初步数据转入分析阶段，开始提取结构化数据、洞察、知识图谱和图表配置。
+
+**作用**：这是 Analyze 阶段的第一步。DataAnalyst 主要负责结构化理解，不负责执行任意代码；CodeWizard 会在其后继续做代码/图表增强。
+
+##### 12.3.2.2 提取候选数据：从事实库中选择可分析材料
+
+**当前行为**：DataAnalyst 调用 `_extract_data()`，读取前 20 条事实。
+
+**目标**：从事实库中挑选一批材料，尝试抽取数值、时间序列、分布、趋势和分析洞察。
+
+**作用**：这一步把文本事实转成后续可计算、可画图、可写入报告的数据素材。
+
+**当前限制**：当前是读取 `state["facts"][:20]`，即事实列表中的前 20 条，不是按相关性、可信度或章节重要性排序后的前 20 条。后续应改为基于 section、source quality、recency 和 data relevance 的筛选。
+
+##### 12.3.2.3 调用数据抽取模型：生成数据点、序列、分布和洞察
+
+**当前行为**：Agent 通过 `DATA_EXTRACTION_PROMPT` 调用 LLM，提取 `data_points/time_series/distributions/insights`。
+
+**目标**：让 LLM 从自然语言事实中识别可结构化的信息，并输出统一 schema。
+
+**作用**：
+
+1. `data_points` 为 Step4 分析、Step5 写作和 Step6 审核提供数字依据。
+2. `time_series` 支持趋势图。
+3. `distributions` 支持占比和结构分析。
+4. `insights` 为报告提供分析观点。
+
+**当前限制**：LLM 抽取可能误读数值、遗漏单位、混淆年份或把不确定描述转成确定数据。后续应保留 `source_fact_id/source_url/source_quote/confidence`，并用确定性校验约束数值字段。
+
+##### 12.3.2.4 构建知识图谱：从事实中提取实体和关系
+
+**当前行为**：DataAnalyst 调用 `_build_knowledge_graph()`，读取前 15 条事实，提取实体和关系。
+
+**目标**：把文本事实中出现的公司、技术、产品、机构、市场关系等转为 `nodes/edges`。
+
+**作用**：知识图谱帮助用户理解研究对象之间的关系，也为前端可视化和后续报告中的关系分析提供材料。
+
+**当前限制**：这是项目代码中的自定义 LLM 抽取流程，不是 LangGraph 内置知识图谱能力。当前节点、边和关系类型主要来自 LLM 输出，缺少 schema 约束、去重、关系置信度和来源绑定。
+
+##### 12.3.2.5 计算图谱节点大小：把重要性转为可视化权重
+
+**当前行为**：系统按 `importance` 为图谱节点计算 `size`。
+
+**目标**：让前端图谱可视化时能用节点大小表达实体重要程度。
+
+**作用**：`importance` 是语义权重，`size` 是可视化属性。这个转换让核心实体在图谱上更醒目。
+
+**当前限制**：`importance` 当前仍主要由 LLM 判断，不是基于引用次数、来源质量、关系中心性或数据证据计算。后续应引入确定性权重计算，例如 degree、PageRank、引用频次和来源置信度。
+
+##### 12.3.2.6 生成图表输入：把提取数据交给图表生成流程
+
+**当前行为**：DataAnalyst 调用 `_generate_charts()`，把本轮提取数据和已有 `data_points` 传给 `CHART_GENERATION_PROMPT`。
+
+**目标**：根据已抽取的数据点、时间序列和分布信息，生成适合前端渲染的图表配置。
+
+**作用**：这一步把结构化数据转成用户可视化理解的载体，例如趋势折线图、分类柱状图或占比图。
+
+**当前限制**：图表选择和 ECharts option 当前仍由 LLM 生成，缺少图表类型规则、数据一致性校验和 `source_data_point_ids` 绑定。
+
+##### 12.3.2.7 输出或跳过图表：避免在数据不足时生成假图
+
+**当前行为**：如果存在可用数据，LLM 输出 ECharts `option`；如果没有数据，则跳过图表生成。
+
+**目标**：在有足够数据时输出可视化配置，在数据不足时避免为了展示而伪造图表。
+
+**作用**：跳过图表比生成错误图表更安全。它能防止无数据场景下出现误导用户的可视化结果。
+
+**当前限制**：是否“存在可用数据”仍偏宽松。后续应明确图表生成门槛，例如至少 2 个时间点才能画趋势图，占比图必须检查合计范围，x/y 序列长度必须一致。
 
 #### 12.3.3 输出
 

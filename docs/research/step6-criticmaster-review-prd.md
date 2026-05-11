@@ -555,14 +555,107 @@ LLM 审核失败或无结果时，不应误判为通过。当前代码在无 `re
 
 #### 12.3.2 调用链与方案
 
-1. Graph 进入 Review 循环，发送 `phase="reviewing"`。
-2. CriticMaster 校验 `phase` 后进入 `_review_content()`。
-3. 系统优先拼接 `draft_sections` 作为待审内容；如果为空，则使用 `final_report`。
-4. 系统汇总前 20 条事实、前 15 条数据点和大纲章节状态。
-5. 通过 `REVIEW_PROMPT` 调用 LLM，要求输出 `overall_assessment/issues/fact_check_results/missing_aspects/strength_points`。
-6. 系统为每条 issue 生成唯一 ID，设置 `resolved=false`，追加到 `critic_feedback`。
-7. 系统写入 `quality_score`，并按 critical/major 数量更新 `unresolved_issues`。
-8. `_analyze_issues_for_routing()` 判断问题是否需要补充搜索。
+##### 12.3.2.1 进入审核阶段：让流程从写作转入质量控制
+
+**当前行为**：Graph 进入 Review 循环，发送 `phase="reviewing"`。
+
+**目标**：明确告诉系统“报告已经从写作阶段进入审核阶段”，后续不再继续生成正文，而是检查现有报告质量。
+
+**作用**：这是流程路由信号。没有这个阶段切换，CriticMaster 不应开始审核，LeadWriter 也可能继续停留在写作或修订逻辑中。
+
+##### 12.3.2.2 校验执行条件：防御非 Review 阶段的误调用
+
+**当前行为**：CriticMaster 先检查 `state["phase"]`。只有 `phase == "reviewing"` 时才进入 `_review_content()`；如果不是 `reviewing`，直接返回原 `state`。
+
+**目标**：在正常 Graph 流程之外提供一道防御式门禁。正常情况下，Graph 应该在写作完成后先把 `phase` 设置为 `reviewing`，再调用 CriticMaster；这个判断用于防止测试、断点恢复、异常路由或未来流程改造时误调用 CriticMaster。
+
+**作用**：如果 CriticMaster 被错误调用，例如当前仍是 `planning/researching/analyzing/writing/revising/re_researching/completed`，它不会调用审核 LLM，不会写入 `critic_feedback`，不会修改 `quality_score`，也不会改变后续路由。
+
+**当前限制**：该门禁只检查 `phase`，不等于完整的输入就绪校验。如果 Graph 错误地设置了 `phase="reviewing"`，但 `draft_sections/final_report` 为空，当前 CriticMaster 仍可能进入审核。后续应补充“报告内容非空、章节草稿存在、iteration 未超限”等检查。
+
+##### 12.3.2.3 选择待审内容：确定 CriticMaster 具体审核什么文本
+
+**当前行为**：系统优先拼接 `draft_sections` 作为待审内容；如果为空，则使用 `final_report`。
+
+**目标**：把可审核内容整理成一段完整文本，交给审核 prompt 使用。
+
+**作用**：`draft_sections` 更接近章节级写作结果，便于定位具体章节问题；`final_report` 是兜底输入，保证系统在只有完整报告字符串时也能继续审核。
+
+**当前限制**：拼接后的文本会丢失部分结构化上下文，例如每个段落对应的 `fact_id/data_point_id/chart_id`。后续如果引入 claim ledger，应优先审核结构化 claim，而不是只审核自然语言文本。
+
+##### 12.3.2.4 汇总审核依据：给 CriticMaster 提供事实、数据和结构上下文
+
+**当前行为**：系统汇总前 20 条事实、前 15 条数据点和大纲章节状态。
+
+**目标**：让 CriticMaster 不只看报告正文，还能对照上游事实、数据点和大纲，判断报告是否有遗漏、错配或缺少来源。
+
+**作用**：
+
+1. `facts` 用于检查正文中的关键判断是否有来源支撑。
+2. `data_points` 用于检查数字、趋势、市场规模等表述是否有数据依据。
+3. `outline` 用于检查报告是否覆盖了原计划章节。
+
+**当前限制**：这里的“前 20 条”和“前 15 条”是截断策略，不代表最相关或最可信的材料。后续应改为按章节、相关性、可信度和引用频次选择审核依据。
+
+##### 12.3.2.5 调用审核模型：生成结构化质量评估结果
+
+**当前行为**：通过 `REVIEW_PROMPT` 调用 LLM，要求输出 `overall_assessment/issues/fact_check_results/missing_aspects/strength_points`。
+
+**目标**：让模型从完整性、事实支撑、数据准确性、逻辑结构、引用质量等维度识别报告问题。
+
+**作用**：这一阶段把自然语言报告转成结构化审核结果，供后续流程判断是否通过、修订还是补充搜索。
+
+关键输出含义：
+
+- `overall_assessment`：整体判断和质量分。
+- `issues`：需要修复的问题列表。
+- `fact_check_results`：事实核查结果或疑点。
+- `missing_aspects`：报告缺失但应覆盖的方面。
+- `strength_points`：报告已经做得较好的点。
+
+**当前限制**：这里是 LLM 审核，不是确定性 fact checker。它能发现明显问题，但不能保证所有事实都被真实验证。
+
+##### 12.3.2.6 标准化问题对象：把模型反馈转成可追踪任务
+
+**当前行为**：系统为每条 issue 生成唯一 ID，设置 `resolved=false`，追加到 `critic_feedback`。
+
+**目标**：把 LLM 输出的审核意见变成系统可追踪的结构化问题。
+
+**作用**：
+
+1. `id` 用于后续修订、复审和前端展示。
+2. `resolved=false` 表示问题尚未处理。
+3. `critic_feedback` 成为 LeadWriter 修订和 DeepScout 补充搜索的任务来源。
+
+如果没有这一步，审核意见只是一段文本，后续 Agent 很难知道哪些问题已经处理、哪些仍然未解决。
+
+##### 12.3.2.7 计算质量状态：决定报告是否达到通过门槛
+
+**当前行为**：系统写入 `quality_score`，并按 critical/major 数量更新 `unresolved_issues`。
+
+**目标**：把审核结果压缩成流程可判断的状态指标。
+
+**作用**：
+
+1. `quality_score` 用于判断报告是否可以通过。
+2. `critical/major` 问题数量用于判断是否必须继续修复。
+3. `unresolved_issues` 用于控制循环是否还需要继续。
+
+在当前规则中，`quality_score >= 7` 且没有阻断性问题，才有机会进入完成状态；否则需要修订或补充搜索。
+
+##### 12.3.2.8 判断后续路由：决定是补充搜索、修订，还是完成
+
+**当前行为**：`_analyze_issues_for_routing()` 判断问题是否需要补充搜索。
+
+**目标**：根据问题类型决定下一步应该由哪个阶段处理。
+
+**作用**：
+
+1. 如果问题是缺少来源、信息不完整、数据过旧，并且需要新材料，则进入 `re_researching`，由 DeepScout 补充搜索。
+2. 如果问题主要是表达、结构、引用格式或逻辑组织，则进入 `revising`，由 LeadWriter 修订报告。
+3. 如果质量分和问题数量达到通过条件，则进入完成路径。
+
+这一步是 Review 阶段的闭环控制点。CriticMaster 不直接修改报告，也不直接联网；它负责判断问题性质，并把流程路由给最合适的上游阶段。
 
 #### 12.3.3 输出
 
@@ -641,9 +734,213 @@ LLM 审核失败或无结果时，不应误判为通过。当前代码在无 `re
 - CriticMaster 当前 `final_check()` 未进入主流程，不能把最终检查视为已启用能力。
 - 达到最大迭代后可能仍有未解决问题，系统会强制完成并提示风险。
 
-## 15. 后续需求变更候选
+## 15. 当前实现限制与专业化改造建议
 
-### 15.1 Rubric 化评分
+本节记录当前 Step 6 的核心问题和后续专业化改造方向。以下内容不改变当前代码行为，作为后续统一处理的产品和工程依据。
+
+Step 6 的本质不是普通文本润色，而是质量门控与流程路由评测。它要判断当前报告是否达标、问题在哪里、问题严重程度如何、是否需要继续迭代，以及下一步应该回到 Research、Analyze、Write 还是人工处理。
+
+### 15.1 核心风险：LLM 评测不稳定会放大为路由错误
+
+当前 CriticMaster 主要依赖 LLM 阅读报告和上游素材后输出审核结论。这个设计可以快速形成闭环，但核心风险是：LLM 对当前进展的评估不一定准确，后续路由也可能随之错误。
+
+典型错误包括：
+
+| 错误类型 | 表现 | 影响 |
+| --- | --- | --- |
+| 漏判 | 报告存在缺来源、数字不一致或逻辑跳跃，但 LLM 未发现 | 系统可能误判为可完成 |
+| 误判 | 报告已有足够依据，但 LLM 认为缺资料 | 系统可能错误进入 `re_researching` |
+| 错分问题类型 | 真实问题是引用绑定差，但 LLM 判断为缺少事实 | 本应回 Step5 修订，却错误回 Step2 补搜 |
+| 严重程度不稳 | 同一问题在不同轮被判为 `major/minor` 不一致 | 影响 `quality_score` 和是否继续迭代 |
+| 路由依据过粗 | 只依赖 `missing_source/incomplete/outdated` 等 issue type | 难以区分补搜、修订、数据修复、人工确认 |
+
+因此，当前链路的风险传导是：
+
+```text
+LLM 审核结果不稳定
+    -> issue 识别可能不准
+    -> issue 类型和严重程度可能不准
+    -> quality_score 可能不准
+    -> re_researching / revising / completed 路由可能不准
+```
+
+### 15.2 当前做得较好的部分
+
+当前实现已经具备 Review 闭环的基础骨架：
+
+1. **阶段门禁**：只有 `phase="reviewing"` 时才执行审核，能防御非 Review 阶段误调用。
+2. **结构化审核输出**：要求 LLM 返回 `overall_assessment/issues/fact_check_results/missing_aspects/strength_points`，不是只返回自然语言评价。
+3. **Issue 任务化**：每个 issue 会生成 `id`，设置 `resolved=false`，并写入 `critic_feedback`。
+4. **自动路由意识**：`_analyze_issues_for_routing()` 会判断是否需要补充搜索，而不是所有问题都回到写作阶段。
+5. **最大迭代保护**：达到 `max_iterations` 后强制完成并提示 warning，避免无限循环。
+
+这些能力说明 Step 6 已经不是单纯“打分器”，而是 Review/Revise/Re-Research 循环的控制点。
+
+### 15.3 当前主要不足
+
+#### 15.3.1 审核依据截断
+
+当前审核依据会截取前 20 条 `facts`、前 15 条 `data_points` 和大纲状态。这是上下文控制策略，但不等于相关性选择。
+
+风险：
+
+- 前 N 条不一定是当前报告最关键的证据。
+- 高可信来源可能排在后面而未进入审核 prompt。
+- 某个章节的问题可能需要章节级证据，而不是全局摘要。
+- LLM 可能基于不完整上下文给出错误路由。
+
+#### 15.3.2 缺少 claim 级审核
+
+当前 CriticMaster 审核的是拼接后的报告文本，不是结构化 claim。它很难严格回答：
+
+- 这句话对应哪个 `fact_id`？
+- 这个数字对应哪个 `data_point_id`？
+- 这个图表解释是否超出了 `chart_id` 所表达的数据？
+- 这个结论是否由来源直接支持，还是 LLM 推断？
+
+没有 claim 级结构，Step6 很难做精确 fact checking，也很难稳定复查 issue 是否解决。
+
+#### 15.3.3 路由规则过粗
+
+当前路由主要判断是否存在 `missing_source/incomplete/outdated` 且需要搜索。这个规则方向正确，但粒度不够。
+
+现实问题至少应区分：
+
+| 问题类型 | 应路由到 |
+| --- | --- |
+| 缺新来源或新事实 | Step2 / Re-Research |
+| 已有事实未正确引用 | Step5 / Revise |
+| 数据点单位、年份、口径不一致 | Step3 / Re-Analyze |
+| 图表数据或图表解释错误 | Step4 / Re-Analyze |
+| 报告结构、表达、摘要质量问题 | Step5 / Revise |
+| 高风险、模型无法判断 | Human Review |
+
+#### 15.3.4 Issue 生命周期不完整
+
+当前 issue 初始状态是 `resolved=false`，但后续缺少严格的生命周期管理。
+
+缺失点：
+
+- issue 是否已分配给某个阶段。
+- 修订是否真的处理了该 issue。
+- 解决证据是什么。
+- 下一轮审核是否验证通过。
+- 无法处理的问题是否被用户豁免。
+
+#### 15.3.5 缺少确定性校验
+
+当前审核主要依赖 LLM。后续应加入规则校验，先处理可以确定判断的问题：
+
+- Markdown 中的 URL 是否存在。
+- `chart_id` 是否真实存在于 `charts`。
+- 图表标题是否匹配。
+- 报告数字是否能匹配 `data_points`。
+- 章节是否覆盖 `outline`。
+- critical issue 是否阻止完成。
+- `quality_score` 是否与 issue 严重程度一致。
+
+### 15.4 推荐目标架构
+
+后续 Step 6 应从“LLM 审稿”升级为“规则校验 + claim/evidence 对照 + LLM 语义评审 + 路由决策”的质量门控系统。
+
+推荐链路：
+
+```text
+final_report + draft_sections + claim_ledger + evidence_packs
+    -> deterministic_checks
+    -> claim_evidence_review
+    -> LLM_semantic_review
+    -> issue_normalization
+    -> route_decision
+    -> issue_lifecycle_update
+```
+
+各模块职责：
+
+| 模块 | 职责 | 输出 |
+| --- | --- | --- |
+| deterministic_checks | 检查 URL、chart_id、数字匹配、章节覆盖 | hard rule issues |
+| claim_evidence_review | 对照 claim 与 fact/data/chart 关系 | unsupported/weak claims |
+| LLM_semantic_review | 判断逻辑、完整性、表达、洞察质量 | semantic issues |
+| issue_normalization | 合并重复问题、统一严重程度 | normalized issues |
+| route_decision | 决定补搜、重分析、修订、人工处理或完成 | next_phase |
+| issue_lifecycle_update | 记录 issue 状态、处理证据和复审结果 | updated critic_feedback |
+
+### 15.5 路由决策应由多信号共同决定
+
+后续不应让 LLM 独占最终路由权。路由应综合：
+
+1. 确定性规则结果。
+2. claim/evidence 对照结果。
+3. LLM 语义审核结果。
+4. issue 严重程度。
+5. 当前迭代次数。
+6. 是否存在高风险领域或人工确认要求。
+
+推荐路由规则：
+
+```text
+if hard_rule_critical_issue:
+    route = "revising" or "re_analyzing"
+elif missing_required_source and no_existing_fact_support:
+    route = "re_researching"
+elif missing_citation_but_existing_fact_support:
+    route = "revising"
+elif numeric_or_chart_mismatch:
+    route = "re_analyzing"
+elif semantic_quality_issue:
+    route = "revising"
+elif high_risk_uncertainty:
+    route = "human_review"
+elif quality_score >= threshold and no_blocking_issue:
+    route = "completed"
+```
+
+### 15.6 Issue 生命周期建议
+
+Issue 不应只有 `resolved=true/false`。推荐状态：
+
+```json
+{
+  "id": "issue_001",
+  "status": "open",
+  "assigned_to": "LeadWriter",
+  "route": "revising",
+  "resolution_evidence": [],
+  "verified_by": null,
+  "verified_at_iteration": null,
+  "waived_by_user": false
+}
+```
+
+状态流转：
+
+```text
+open -> routed -> fixed -> verified
+open -> routed -> unable_to_fix -> human_review
+open -> waived
+```
+
+这样 Step6 才能回答“问题是否真的解决”，而不是每轮重新生成一批无关联的审核意见。
+
+### 15.7 推荐优化优先级
+
+| 优先级 | 优化项 | 目标 |
+| --- | --- | --- |
+| P0 | 明确 Step6 是质量门控与路由评测器 | 防止把 Review 简化为文本打分 |
+| P0 | 增加确定性校验 | 先发现 URL、chart_id、数字、章节覆盖等硬问题 |
+| P1 | 引入 claim ledger 审核 | 支持 claim 级事实和数据核查 |
+| P1 | 使用 Evidence Pack 替代前 N 条素材截断 | 提升审核依据相关性 |
+| P1 | 细化路由类型 | 区分补搜、修订、重分析和人工处理 |
+| P2 | 建立 issue 生命周期 | 支持跨轮追踪和复审 |
+| P2 | 接入 `final_check()` 到主流程 | 最后一轮确认旧问题已解决且未引入新问题 |
+| P2 | 高风险领域人工审核门 | 避免 LLM 单独决定完成 |
+
+当前文档中的 CriticMaster 能力应被理解为 demo/prototype 级质量闭环能力；面向高敏、金融、医疗、政策、投研等场景时，必须完成结构化评测和路由治理后才可作为严肃交付门控。
+
+## 16. 后续需求变更候选
+
+### 16.1 Rubric 化评分
 
 **变更说明**：把质量分拆成事实准确性、来源质量、逻辑完整性、覆盖度、表达质量等维度。
 
@@ -651,7 +948,7 @@ LLM 审核失败或无结果时，不应误判为通过。当前代码在无 `re
 
 **影响范围**：CriticMaster prompt、前端质量展示、验收标准。
 
-### 15.2 最终检查接入主流程
+### 16.2 最终检查接入主流程
 
 **变更说明**：在最后一轮修订后调用 `final_check()`。
 
@@ -659,7 +956,7 @@ LLM 审核失败或无结果时，不应误判为通过。当前代码在无 `re
 
 **影响范围**：Graph 循环、CriticMaster 输出、前端最终状态。
 
-### 15.3 用户审核门
+### 16.3 用户审核门
 
 **变更说明**：CriticMaster 给出结果后允许用户决定继续补搜、修订或强制完成。
 
@@ -667,7 +964,7 @@ LLM 审核失败或无结果时，不应误判为通过。当前代码在无 `re
 
 **影响范围**：Graph 中断恢复、前端交互、状态保存。
 
-### 15.4 事实级引用核查
+### 16.4 事实级引用核查
 
 **变更说明**：对报告中的每个关键事实映射到来源并检查是否存在引用。
 
@@ -675,7 +972,7 @@ LLM 审核失败或无结果时，不应误判为通过。当前代码在无 `re
 
 **影响范围**：LeadWriter 引用映射、CriticMaster fact check、数据结构。
 
-### 15.5 审核结果可视化
+### 16.5 审核结果可视化
 
 **变更说明**：按章节展示问题热力图和严重程度。
 
@@ -683,7 +980,7 @@ LLM 审核失败或无结果时，不应误判为通过。当前代码在无 `re
 
 **影响范围**：CriticMaster issue schema、前端详情页。
 
-## 16. 待确认问题
+## 17. 待确认问题
 
 1. 质量通过阈值是否固定为 7，还是应允许用户或配置调整？
 2. 达到最大迭代后是否应强制完成，还是停在“需要人工处理”状态？

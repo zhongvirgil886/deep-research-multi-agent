@@ -363,13 +363,81 @@ LLM 输出可能不是标准 JSON。系统需要：
 
 #### 12.3.2 调用链与方案
 
-1. Graph 将初始状态交给 `ChiefArchitect.process(state)`。
-2. ChiefArchitect 识别 `phase="init"`，进入 `_initial_planning()`。
-3. Agent 通过 `BaseAgent.call_llm()` 调用规划模型，使用 `PLANNING_PROMPT`。
-4. LLM 输出研究理解、大纲、关键实体、研究问题和假设。
-5. 如果 LLM 输出扁平字段，如 `sec_1_title/sec_1_query`，系统调用 `_convert_flat_to_outline()` 转换。
-6. 如果输出没有 `outline` 或章节少于 3 个，最多重试 2 次，并使用简化 prompt。
-7. 系统规范化每个章节，补齐 `id/title/description/section_type/requires_data/requires_chart/search_queries/status`。
+##### 12.3.2.1 接收初始状态：把用户问题交给规划 Agent
+
+**当前行为**：Graph 将初始状态交给 `ChiefArchitect.process(state)`。
+
+**目标**：把用户输入的研究问题、配置项和初始 `ResearchState` 交给规划阶段处理。
+
+**作用**：这是整个 DeepResearch 流程的入口。ChiefArchitect 不直接搜索或写报告，而是先决定“要研究什么、拆成哪些章节、需要哪些搜索任务”。
+
+##### 12.3.2.2 校验规划阶段：确认当前处于 init 阶段
+
+**当前行为**：ChiefArchitect 识别 `phase="init"`，进入 `_initial_planning()`。
+
+**目标**：确认当前状态确实处于初始规划阶段，避免在搜索、分析、写作或审核阶段重复生成大纲。
+
+**作用**：这是基础阶段门禁。只有初始阶段才应该创建研究计划；后续阶段应消费这个计划，而不是重新覆盖它。
+
+**当前限制**：该检查主要依赖 `phase`。如果恢复 checkpoint 时 `phase` 设置不准确，仍可能出现重复规划或跳过规划的问题。
+
+##### 12.3.2.3 调用规划模型：生成研究计划的原始草案
+
+**当前行为**：Agent 通过 `BaseAgent.call_llm()` 调用规划模型，使用 `PLANNING_PROMPT`。
+
+**目标**：让 LLM 根据用户问题生成结构化研究理解和研究计划。
+
+**作用**：该 prompt 决定后续所有阶段的研究方向。它需要把模糊问题转为可执行的大纲、研究问题、假设、关键实体和搜索线索。
+
+**当前限制**：规划质量依赖 LLM 对用户意图的理解。若用户问题模糊，模型可能生成过宽、过窄或偏离主题的大纲。
+
+##### 12.3.2.4 解析规划结果：获得大纲、实体、问题和假设
+
+**当前行为**：LLM 输出研究理解、大纲、关键实体、研究问题和假设。
+
+**目标**：把模型生成内容转成后续 Agent 可以消费的结构化字段。
+
+**作用**：
+
+1. `outline` 指导 Step2 搜索、Step5 写作和 Step6 覆盖度审核。
+2. `key_entities` 指导后续实体抽取和知识图谱构建。
+3. `research_questions` 指导搜索和最终报告回答重点。
+4. `hypotheses` 提供后续事实验证和结论组织线索。
+
+##### 12.3.2.5 兼容扁平输出：把非标准字段转成 outline
+
+**当前行为**：如果 LLM 输出扁平字段，如 `sec_1_title/sec_1_query`，系统调用 `_convert_flat_to_outline()` 转换。
+
+**目标**：兼容 LLM 未严格按 schema 输出的情况，尽量把可用内容恢复成标准大纲。
+
+**作用**：这是稳定性兜底。即使模型输出格式不完全正确，系统也能尝试提取章节标题、描述和搜索查询，降低规划阶段失败率。
+
+**当前限制**：格式兼容只能修复结构问题，不能保证章节质量、搜索查询质量或研究范围合理。
+
+##### 12.3.2.6 规划结果重试：确保大纲满足最低可执行标准
+
+**当前行为**：如果输出没有 `outline` 或章节少于 3 个，最多重试 2 次，并使用简化 prompt。
+
+**目标**：避免后续阶段拿到空大纲或过短大纲，导致搜索、分析和写作无法展开。
+
+**作用**：这是最低质量门槛。至少 3 个章节意味着系统能形成基本的结构化研究路径，而不是只围绕一个段落做浅层回答。
+
+**当前限制**：章节数量达标不代表规划质量达标。后续还应检查章节是否覆盖用户问题、是否有有效搜索查询、是否存在重复章节。
+
+##### 12.3.2.7 规范化章节字段：形成统一的下游执行契约
+
+**当前行为**：系统规范化每个章节，补齐 `id/title/description/section_type/requires_data/requires_chart/search_queries/status`。
+
+**目标**：把 LLM 规划草案转成后续阶段可稳定读取的章节 schema。
+
+**作用**：这是 Step1 最关键的工程化输出。统一字段会直接影响：
+
+1. DeepScout 读取 `search_queries` 执行搜索。
+2. DataAnalyst/CodeWizard 根据 `requires_data/requires_chart` 判断分析需求。
+3. LeadWriter 按 `outline` 逐章节写作。
+4. CriticMaster 按章节状态审核覆盖度。
+
+**当前限制**：字段补齐不能替代语义校验。比如 `requires_chart=true` 是否真的必要，`section_type` 是否准确，仍需要后续规则或人工确认增强。
 
 #### 12.3.3 输出
 

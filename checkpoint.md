@@ -1,5 +1,17 @@
 # Checkpoint
 
+## Codex Save - 2026-05-11 PRD Refinement
+
+- Saved DeepResearch Step1-Step6 PRD refinement session.
+- Expanded Step1-Step4 `调用链与方案` sections into step-by-step explanations with subheadings, current behavior, goal, role, and current limitations.
+- Expanded Step5 `12.3.2 调用链与方案` using the same format, clarifying writing entry, section traversal, evidence collection, data/chart collection, LLM section writing, draft persistence, report synthesis, and fallback report behavior.
+- Expanded Step6 `12.3.2 调用链与方案` using the same format, clarifying review entry, phase gate, review content selection, evidence summary, LLM review, issue normalization, quality state calculation, and routing decision.
+- Added Step5 professionalization guidance: evidence-bound writing, Evidence Pack, Claim-Citation ledger, numeric/chart locking, writing/composition split, and revision audit trail.
+- Added Step6 professionalization guidance: LLM evaluation instability, routing error risks, deterministic checks, claim/evidence review, multi-signal routing, issue lifecycle, and quality gate roadmap.
+- Verified `docs/research/index.md` still registers Step1-Step6 and `canonical-examples.md`.
+- Verification status: documentation-level checks only; no backend/frontend tests were run.
+- Remaining risk: unrelated existing modifications in `docs/design-docs/deepresearch-eval-platform-design.md` and `docs/design-docs/index.md` remain in the worktree and are not part of this research PRD refinement.
+
 ## Codex Save - 2026-05-11
 
 - Saved DeepResearch six-step research PRD documentation session before cloud push.

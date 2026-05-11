@@ -533,15 +533,99 @@ DeepScout 是当前链路中最需要实时输出的阶段。产品上要求搜�
 
 #### 13.3.2 调用链与方案
 
-1. Graph 设置 `state["phase"]="researching"`，调用 `DeepScout.process(state)`。
-2. DeepScout 读取 `outline` 中 `status="pending"` 的章节，每轮最多处理 3 个章节。
-3. 对 `sec_1.search_queries` 逐个执行搜索。
-4. 因 `search_web=true`，调用 `_execute_search(query)`，当前实现使用 Bocha Web Search API。
-5. 因 `search_local=false`，本轮不调用 `_execute_local_search()`；如果为 true，则通过 Milvus 向量检索本地知识库。
-6. 搜索结果返回后，发送 `search_progress` 和增量 `search_results`。
-7. DeepScout 调用 `_analyze_search_results()`，通过 LLM 把搜索结果抽取为 `extracted_facts/data_points/entities_discovered/key_insights/follow_up_queries/source_tracing_queries`。
-8. 系统对事实做指纹去重，把数据点写入 `state["data_points"]`，把实体关系写入 `knowledge_graph`。
-9. 如果 LLM 返回 `source_tracing_queries` 或 `follow_up_queries`，且未超过搜索预算，则进入深度搜索追踪。
+##### 13.3.2.1 进入研究阶段：把规划大纲转成搜索任务
+
+**当前行为**：Graph 设置 `state["phase"]="researching"`，调用 `DeepScout.process(state)`。
+
+**目标**：明确系统已经从规划阶段进入资料收集阶段，开始根据 Step1 的大纲和搜索词获取外部或本地信息。
+
+**作用**：这是 Research 阶段的路由信号。DeepScout 的职责是补充事实、来源、数据点和实体线索，而不是生成报告正文。
+
+##### 13.3.2.2 选择待研究章节：控制每轮搜索范围
+
+**当前行为**：DeepScout 读取 `outline` 中 `status="pending"` 的章节，每轮最多处理 3 个章节。
+
+**目标**：从大纲中选择当前需要搜索的章节，并控制单轮搜索任务规模。
+
+**作用**：限制每轮最多 3 个章节可以避免搜索任务爆炸，也让前端能够看到分批推进的研究进度。
+
+**当前限制**：`pending` 只表示章节未处理，不等于优先级最高。后续应结合 `priority`、用户关注点、缺口严重程度和 Review 反馈决定处理顺序。
+
+##### 13.3.2.3 执行章节搜索词：把章节问题转成具体检索请求
+
+**当前行为**：对 `sec_1.search_queries` 逐个执行搜索。
+
+**目标**：把 ChiefArchitect 生成的章节搜索词逐条发送给搜索工具，获取与章节目标相关的候选资料。
+
+**作用**：`search_queries` 是 Step1 和 Step2 的连接点。搜索词质量直接决定资料覆盖度、来源质量和后续事实抽取质量。
+
+**当前限制**：当前按搜索词顺序执行，不一定会根据搜索结果质量动态改写 query。后续可增加 query rewriting、去重和搜索意图分类。
+
+##### 13.3.2.4 执行 Web 搜索：获取互联网来源
+
+**当前行为**：因 `search_web=true`，调用 `_execute_search(query)`，当前实现使用 Bocha Web Search API。
+
+**目标**：从互联网搜索结果中获取报告、新闻、官网、研究机构等公开资料。
+
+**作用**：Web 搜索是当前事实来源的主要入口。它为后续 `_analyze_search_results()` 提供标题、URL、摘要和内容片段。
+
+**当前限制**：Web 搜索返回的是候选结果，不等于事实已经验证。搜索结果排序、摘要质量、来源可信度和时效性都需要后续判断。
+
+##### 13.3.2.5 按需执行本地检索：补充私有知识库材料
+
+**当前行为**：因 `search_local=false`，本轮不调用 `_execute_local_search()`；如果为 true，则通过 Milvus 向量检索本地知识库。
+
+**目标**：在需要时从本地资料库检索已有文档、内部报告或历史研究结果。
+
+**作用**：本地检索可以补充 Web 搜索没有覆盖的私有材料，也能降低重复联网搜索成本。
+
+**当前限制**：本案例没有启用本地检索。即使启用，向量检索结果也需要和 Web 来源一样进行来源、时效、相关性和可引用性判断。
+
+##### 13.3.2.6 发送搜索进度：让用户看到增量检索过程
+
+**当前行为**：搜索结果返回后，发送 `search_progress` 和增量 `search_results`。
+
+**目标**：把搜索执行状态和部分结果实时传给前端。
+
+**作用**：这一步提升可观测性。用户可以看到系统正在查什么、查到了哪些来源，而不是等全部搜索结束才看到结果。
+
+**当前限制**：前端展示搜索结果不代表这些结果已经进入事实库。它们仍需经过抽取、去重和可信度判断。
+
+##### 13.3.2.7 抽取结构化研究材料：把搜索结果转成事实和数据
+
+**当前行为**：DeepScout 调用 `_analyze_search_results()`，通过 LLM 把搜索结果抽取为 `extracted_facts/data_points/entities_discovered/key_insights/follow_up_queries/source_tracing_queries`。
+
+**目标**：从原始搜索结果中提取后续阶段可用的结构化材料。
+
+**作用**：
+
+1. `extracted_facts` 进入事实库，支撑写作和审核。
+2. `data_points` 提供可分析数据。
+3. `entities_discovered` 为知识图谱提供节点和关系线索。
+4. `key_insights` 为后续报告提供分析观点。
+5. `follow_up_queries/source_tracing_queries` 用于发现资料缺口和追踪源头。
+
+**当前限制**：该抽取依赖 LLM，可能漏抽、误抽或把搜索摘要中的不确定描述写成确定事实。后续应增加来源片段、置信度、原文引用和抽取校验。
+
+##### 13.3.2.8 写入研究状态：去重并沉淀事实、数据和图谱
+
+**当前行为**：系统对事实做指纹去重，把数据点写入 `state["data_points"]`，把实体关系写入 `knowledge_graph`。
+
+**目标**：把本轮搜索得到的结构化材料合并到全局 `ResearchState`，供 Step3-Step6 继续使用。
+
+**作用**：这是 Step2 的核心产物沉淀。后续 DataAnalyst、CodeWizard、LeadWriter 和 CriticMaster 都会消费这些 facts/data_points/knowledge_graph。
+
+**当前限制**：指纹去重主要解决重复文本问题，不能识别语义重复、来源冲突、口径冲突或数据过期。后续需要更强的 fact lineage 和 conflict resolution。
+
+##### 13.3.2.9 触发深度追踪：在预算内继续补充关键缺口
+
+**当前行为**：如果 LLM 返回 `source_tracing_queries` 或 `follow_up_queries`，且未超过搜索预算，则进入深度搜索追踪。
+
+**目标**：对重要但尚未充分支撑的问题继续搜索，追踪更权威的来源或补齐缺失信息。
+
+**作用**：这是 DeepScout 从普通搜索升级为深度研究的关键机制。它能让系统不止满足于第一轮搜索结果，而是沿着缺口继续追问。
+
+**当前限制**：是否继续追踪仍依赖 LLM 给出的 follow-up 判断和预算限制。若 LLM 漏掉关键缺口，系统可能不会继续搜索；若 LLM 过度追踪，也可能浪费搜索预算。
 
 #### 13.3.3 输出
 

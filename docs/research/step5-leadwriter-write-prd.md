@@ -592,15 +592,99 @@ Markdown 应能直接在前端渲染，避免输出破碎 JSON 或未闭合格�
 
 #### 12.3.2 调用链与方案
 
-1. Graph 发送 `phase="writing"`，设置 `state["phase"]="writing"`。
-2. LeadWriter 进入 `_write_report()`，发送 `research_step` running。
-3. `_write_section()` 遍历 `outline`，跳过 `final/drafted` 章节。
-4. 对 `sec_1` 收集关联事实；如果没有关联事实，则回退到前 10 条事实。
-5. 收集前 10 条 `data_points`、前 5 条 `insights` 和匹配 `section_id` 的图表。
-6. 通过 `SECTION_WRITING_PROMPT` 调用 LLM，要求输出章节正文、要点和引用。
-7. 写入 `draft_sections["sec_1"]`，并把章节状态改为 `drafted`。
-8. `_synthesize_report()` 汇总章节内容、事实来源和引用，通过 `SYNTHESIS_PROMPT` 合成完整报告。
-9. 如果合成 JSON 解析失败，使用已有章节内容生成 fallback 报告。
+##### 12.3.2.1 进入写作阶段：把流程从分析产物转为报告产物
+
+**当前行为**：Graph 发送 `phase="writing"`，设置 `state["phase"]="writing"`。
+
+**目标**：明确告诉系统前序 Research/Analyze 阶段已经结束，当前任务从“继续收集和分析信息”切换为“生成可阅读报告”。
+
+**作用**：这是写作阶段的路由信号。LeadWriter 只应在 `writing` 或 `revising` 阶段处理内容，避免在搜索或分析阶段提前生成报告。
+
+##### 12.3.2.2 启动 LeadWriter：建立章节写作任务上下文
+
+**当前行为**：LeadWriter 进入 `_write_report()`，发送 `research_step` running。
+
+**目标**：初始化本轮写作任务，并向前端或事件流说明“报告撰写正在进行”。
+
+**作用**：让用户看到系统已经从数据处理转入写作，同时为后续章节内容、报告草稿和完成事件建立统一上下文。
+
+##### 12.3.2.3 遍历大纲章节：确定哪些章节需要生成
+
+**当前行为**：`_write_section()` 遍历 `outline`，跳过 `final/drafted` 章节。
+
+**目标**：按 ChiefArchitect 规划的大纲逐章写作，并避免重复生成已经完成或已确认的章节。
+
+**作用**：`outline` 是 Step5 的结构主轴。LeadWriter 不应该自由决定报告结构，而应该沿用 Step1 生成的大纲，把上游素材填入对应章节。
+
+**当前限制**：当前跳过逻辑主要依赖章节 `status`。如果章节状态维护不准确，可能出现应写未写、已写重复写或旧章节未刷新等问题。
+
+##### 12.3.2.4 收集章节事实：为当前章节准备证据素材
+
+**当前行为**：对 `sec_1` 收集 `related_sections` 包含当前 `section_id` 的事实；如果没有关联事实，则回退到前 10 条事实。
+
+**目标**：为当前章节提供事实依据，避免章节正文完全依赖模型自由发挥。
+
+**作用**：事实素材决定章节能否写出有来源支撑的判断。相关事实会进入 `SECTION_WRITING_PROMPT`，供 LLM 生成带引用的段落。
+
+**当前限制**：回退到前 10 条事实只是兜底策略，不代表这些事实与章节真正相关。后续应使用章节级 Evidence Pack 替代“相关事实 + 前 N 条回退”。
+
+##### 12.3.2.5 收集数据、洞察和图表：把分析产物转成章节写作素材
+
+**当前行为**：收集前 10 条 `data_points`、前 5 条 `insights` 和匹配 `section_id` 的图表。
+
+**目标**：让章节不仅有事实叙述，也能包含数据支撑、分析洞察和图表引用。
+
+**作用**：
+
+1. `data_points` 支撑数字、规模、趋势等表述。
+2. `insights` 提供分析性观点。
+3. `charts` 让报告正文可以引用已有可视化结果。
+
+**当前限制**：前 10 条数据点和前 5 条洞察是截断策略，不等于最相关、最新或最可信。图表匹配也主要依赖 `section_id`，缺少对图表数据和正文解释的一致性校验。
+
+##### 12.3.2.6 调用章节写作模型：生成章节正文、要点和引用
+
+**当前行为**：通过 `SECTION_WRITING_PROMPT` 调用 LLM，要求输出章节正文、要点和引用。
+
+**目标**：把当前章节的大纲说明、事实、数据点、洞察和图表整理成自然语言章节草稿。
+
+**作用**：这是 Step5 的核心生成动作。它把上游结构化/半结构化材料转为用户可阅读的 Markdown 文本。
+
+**当前限制**：LLM 可能改写数字、弱化来源、引入未提供的新判断，或者生成不存在的图表引用。后续应要求章节输出同时包含 claim ledger，用于 Step6 审核。
+
+##### 12.3.2.7 写入章节草稿：把生成结果保存为可复用状态
+
+**当前行为**：写入 `draft_sections["sec_1"]`，并把章节状态改为 `drafted`。
+
+**目标**：把章节生成结果从一次性 LLM 输出固化为系统状态，供完整报告合成、前端展示和后续 Review 使用。
+
+**作用**：
+
+1. `draft_sections` 是 `_synthesize_report()` 的输入。
+2. 章节状态 `drafted` 可防止重复写作。
+3. 前端可以收到 `section_content` 事件并展示章节进度。
+
+**当前限制**：当前 `draft_sections` 主要保存 Markdown 文本，缺少结构化 claim、引用映射和图表引用映射，后续审查粒度有限。
+
+##### 12.3.2.8 合成完整报告：把章节草稿组织成最终报告草稿
+
+**当前行为**：`_synthesize_report()` 汇总章节内容、事实来源和引用，通过 `SYNTHESIS_PROMPT` 合成完整报告。
+
+**目标**：将多个章节草稿统一成一份完整报告，包括执行摘要、正文、结论、展望和参考文献。
+
+**作用**：章节写作解决“每一章怎么写”，报告合成解决“整份报告是否连贯、格式统一、可以直接阅读”。最终结果写入 `state["final_report"]`，并进入 Review 阶段。
+
+**当前限制**：完整报告合成仍由 LLM 完成，可能改写章节内容、重新组织事实或遗漏章节细节。后续应优先采用确定性拼装章节，再让 LLM 只生成摘要和衔接句。
+
+##### 12.3.2.9 生成 fallback 报告：保证合成失败时仍有可审查产物
+
+**当前行为**：如果合成 JSON 解析失败，使用已有章节内容生成 fallback 报告。
+
+**目标**：避免因为 LLM 输出格式错误导致 Step5 完全失败。
+
+**作用**：fallback 报告至少能保留已生成章节内容，让流程继续进入 Review，由 CriticMaster 或用户发现质量问题。
+
+**当前限制**：fallback 是稳定性兜底，不是质量保证。它可能缺少执行摘要、结论、参考文献整理和统一格式，因此应在前端或 Review 中标记为降级产物。
 
 #### 12.3.3 输出
 
@@ -681,9 +765,179 @@ Markdown 应能直接在前端渲染，避免输出破碎 JSON 或未闭合格�
 - LeadWriter 不决定报告是否最终完成。
 - 修订流程只基于已有反馈和补充事实，不重新规划大纲。
 
-## 15. 后续需求变更候选
+## 15. 当前实现限制与专业化改造建议
 
-### 15.1 引用去重
+本节记录当前 Step 5 的实现边界和后续专业化改造方向。以下内容不改变当前代码行为，作为后续统一处理的产品和工程依据。
+
+Step 5 的核心不应被理解为“让 LLM 文笔更好”。它是用户最终看到研究价值的交付层，真正难点是 evidence-bound writing：基于证据包写作、关键判断可追溯、数字不失真、图表引用可校验。
+
+### 15.1 素材选择限制
+
+当前 `_write_section()` 会按章节收集素材：
+
+1. 优先使用 `related_sections` 包含当前 `section_id` 的事实。
+2. 如果没有关联事实，则回退到 `state["facts"][:10]`。
+3. 数据点使用 `state["data_points"][:10]`。
+4. 洞察使用前 5 条。
+5. 图表按 `chart.section_id == section_id` 匹配。
+
+这个策略适合 demo，但不适合严肃报告。主要风险是：
+
+- 回退到前 10 条事实不代表事实与章节真正相关。
+- 前 10 条数据点不一定是最重要、最新或最可信的数据。
+- `insights` 没有强制绑定来源、章节或数据点。
+- 写作 prompt 看到的是素材摘要，不是严格可审计的数据包。
+
+专业化目标方案应引入章节级 Evidence Pack：
+
+```json
+{
+  "section_id": "sec_market_size",
+  "section_title": "市场规模与增长趋势",
+  "allowed_fact_ids": ["fact_001", "fact_008"],
+  "allowed_data_point_ids": ["dp_003", "dp_010"],
+  "allowed_chart_ids": ["chart_market_trend"],
+  "required_claim_ids": [],
+  "forbidden_claims": ["无来源市场规模判断"],
+  "writing_constraints": {
+    "allow_new_facts": false,
+    "allow_numeric_recalculation": false,
+    "require_citation_for_key_claims": true
+  }
+}
+```
+
+LeadWriter 只能基于 Evidence Pack 写作，不应自由从全局 `facts/data_points/charts` 中选择素材。
+
+### 15.2 Claim-Citation 机制缺失
+
+当前报告主要输出 Markdown。虽然 prompt 要求引用来源，但系统没有结构化记录每个关键判断对应哪些事实、数据点或图表。
+
+后续应在 Markdown 外同步输出 claim ledger：
+
+```json
+{
+  "claims": [
+    {
+      "claim_id": "claim_001",
+      "section_id": "sec_market_size",
+      "text": "中国 AI 芯片市场在 2024 年达到 500 亿元。",
+      "source_fact_ids": ["fact_001"],
+      "source_data_point_ids": ["dp_003"],
+      "source_chart_ids": ["chart_market_trend"],
+      "confidence": 0.82
+    }
+  ]
+}
+```
+
+这个结构的价值是：
+
+1. CriticMaster 可以逐条审核 claim，而不是只读自然语言报告。
+2. 前端可以展示段落引用依据。
+3. 修订时可以判断新增、删除、改写了哪些 claim。
+4. 导出报告时可以生成更可靠的参考文献和脚注。
+
+### 15.3 数字和图表引用锁定
+
+Step 5 不应重新计算数据，也不应改写上游数值。当前 LLM 写作可能出现：
+
+- 把 `500 亿元` 改写为 `约 500 亿`。
+- 把年份、地区或单位合并表达。
+- 把多个来源的不同口径混在同一段。
+- 引用不存在或不匹配的 `chart_id`。
+- 用自然语言解释图表时引入图表中不存在的结论。
+
+后续应强制以下规则：
+
+1. 报告中的关键数字必须来自 `data_point_id` 或确定性计算结果。
+2. LLM 不得新增数字、改写单位或重新计算指标。
+3. 每个图表引用必须使用存在的 `chart_id`。
+4. 每个图表解释必须绑定对应 `chart_id` 和 `source_data_point_ids`。
+5. 图表标题、章节位置和正文解释必须一致。
+6. 如果素材证据不足，LeadWriter 应输出“不足以支持该判断”，而不是补写推断。
+
+推荐增加报告后处理校验：
+
+```text
+Markdown report
+    -> extract numeric mentions
+    -> match data_point_id or calculated_metric_id
+    -> validate chart_id references
+    -> validate cited source URLs
+    -> block or flag unsupported claims
+```
+
+### 15.4 写作与合成职责拆分
+
+当前 LeadWriter 同时承担章节写作、完整报告合成、摘要生成、参考文献整理和修订。后续可拆成更清晰的内部职责：
+
+| 子职责 | 输入 | 输出 | 约束 |
+| --- | --- | --- | --- |
+| Evidence Pack Builder | outline, facts, data_points, charts | section evidence packs | 不调用自由写作 |
+| Section Writer | section evidence pack | section draft + claims | 只使用允许素材 |
+| Report Composer | section drafts | final_report | 不新增事实 |
+| Executive Summary Writer | final_report claims | executive_summary | 只总结已出现结论 |
+| Citation Normalizer | claims, references | normalized references | 去重、补齐 URL |
+| Consistency Checker | report, claims, charts | validation result | 标记无来源判断 |
+
+这样可以把“写得通顺”和“写得可信”拆开验证。
+
+### 15.5 修订闭环限制
+
+当前 `_revise_report()` 会读取 `critic_feedback`、最近事实和原报告片段，然后调用 LLM 生成 `revised_content`。这个机制可以形成闭环，但还不够可审计。
+
+后续修订输出应明确：
+
+```json
+{
+  "revised_content": "修订后的 Markdown",
+  "changes_made": [
+    {
+      "issue_id": "issue_001",
+      "change_type": "added_citation",
+      "section_id": "sec_market_size",
+      "before": "市场增长较快。",
+      "after": "根据示例行业报告，市场需求受推理部署拉动。",
+      "source_fact_ids": ["fact_001"]
+    }
+  ],
+  "added_claim_ids": ["claim_009"],
+  "removed_claim_ids": ["claim_004"],
+  "updated_claim_ids": ["claim_001"],
+  "unable_to_address": [
+    {
+      "issue_id": "issue_007",
+      "reason": "缺少可引用来源"
+    }
+  ]
+}
+```
+
+修订完成后，CriticMaster 应能复查：
+
+1. 每个高优先级 issue 是否被处理。
+2. 修订是否引入了新事实。
+3. 新增 claim 是否有来源。
+4. 数字和图表引用是否仍然一致。
+5. 无法处理的问题是否被明确说明。
+
+### 15.6 推荐优化优先级
+
+| 优先级 | 优化项 | 目标 |
+| --- | --- | --- |
+| P0 | 章节级 Evidence Pack | 防止全局素材混用和无关事实进入章节 |
+| P0 | 数字和图表引用锁定 | 防止报告中出现无法追溯的数字和图表解释 |
+| P1 | Claim-Citation ledger | 支持 CriticMaster 做结构化审核 |
+| P1 | 报告后处理校验 | 自动发现无来源 claim、错误 chart_id、数字不匹配 |
+| P2 | 写作/合成/摘要/引用职责拆分 | 提升可维护性和可测试性 |
+| P2 | 修订 diff 和 issue 映射 | 让用户和审核 Agent 看清楚改了什么 |
+
+当前文档中的 LeadWriter 能力应被理解为 demo/prototype 级写作能力；面向高敏、金融、医疗、政策、投研等场景时，必须完成 evidence-bound writing 改造后才可作为严肃报告交付链路。
+
+## 16. 后续需求变更候选
+
+### 16.1 引用去重
 
 **变更说明**：按 URL 或来源标题对 `references` 去重。
 
@@ -691,7 +945,7 @@ Markdown 应能直接在前端渲染，避免输出破碎 JSON 或未闭合格�
 
 **影响范围**：LeadWriter 合成、前端来源展示、CriticMaster 审核。
 
-### 15.2 章节级引用映射
+### 16.2 章节级引用映射
 
 **变更说明**：记录每个章节使用了哪些引用。
 
@@ -699,7 +953,7 @@ Markdown 应能直接在前端渲染，避免输出破碎 JSON 或未闭合格�
 
 **影响范围**：`draft_sections` schema、CriticMaster prompt、前端报告展示。
 
-### 15.3 人工编辑检查点
+### 16.3 人工编辑检查点
 
 **变更说明**：写作后允许用户编辑报告，再进入 Review。
 
@@ -707,7 +961,7 @@ Markdown 应能直接在前端渲染，避免输出破碎 JSON 或未闭合格�
 
 **影响范围**：前端编辑器、状态保存、审核入口。
 
-### 15.4 报告模板系统
+### 16.4 报告模板系统
 
 **变更说明**：支持咨询报告、投研报告、竞品分析、技术调研等模板。
 
@@ -715,7 +969,7 @@ Markdown 应能直接在前端渲染，避免输出破碎 JSON 或未闭合格�
 
 **影响范围**：ChiefArchitect 大纲、LeadWriter prompt、前端导出。
 
-### 15.5 修订 diff 展示
+### 16.5 修订 diff 展示
 
 **变更说明**：修订完成后生成变更前后 diff。
 
@@ -723,7 +977,7 @@ Markdown 应能直接在前端渲染，避免输出破碎 JSON 或未闭合格�
 
 **影响范围**：LeadWriter 修订输出、前端修订详情。
 
-## 16. 待确认问题
+## 17. 待确认问题
 
 1. 报告默认是否需要严格限制字数，还是按大纲自然展开？
 2. 用户是否需要人工确认草稿后再进入 Review？
