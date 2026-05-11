@@ -1,5 +1,16 @@
 # Checkpoint
 
+## Codex Save - 2026-05-11
+
+- Saved DeepResearch six-step research PRD documentation session before cloud push.
+- Added research-stage PRDs under `docs/research/` for Step 1 through Step 6: ChiefArchitect planning, DeepScout research, DataAnalyst analyze, CodeWizard analyze, LeadWriter write, and CriticMaster review.
+- Added concrete representative cases for Step 1 through Step 6, including inputs, tool/agent call chains, state outputs, and event flow expectations; added `docs/research/canonical-examples.md` for cross-step examples.
+- Updated Step 3 and Step 4 documentation to state current prototype limitations objectively: fact/data ordering limits, LLM-generated knowledge graph/chart/code risks, context-scaling concerns, and the recommended deterministic production architecture.
+- Updated Step 4 with a dedicated "current implementation limits and professionalization recommendations" section covering cumulative `ResearchState` inputs, prompt context growth, LLM-generated code, chart selection rules, and data consistency checks.
+- Updated `docs/research/index.md` to register the new research PRDs and canonical examples.
+- Verification: checked `docs/research/` file list, confirmed index entries for Step 1-6 and `canonical-examples.md`, confirmed Step 4 sections 15.1-15.5 exist. No backend/frontend tests were run because this save only changes documentation.
+- Remaining risk: existing unrelated modifications in `docs/design-docs/deepresearch-eval-platform-design.md` and `docs/design-docs/index.md` are still present in the worktree and were intentionally left out of this save.
+
 ## Codex Save - 2026-05-08
 
 - Saved DeepResearch V2 runtime repair session before cloud push.
